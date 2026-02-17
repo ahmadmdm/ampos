@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma Generate
+        run: npm run db:generate
+
+      - name: API Unit Tests
+        run: npm --workspace @pos1/api run test
+
+      - name: Build All
+        run: npm run build

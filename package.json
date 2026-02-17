@@ -1,0 +1,22 @@
+{
+  "name": "pos1-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace @pos1/api run dev",
+    "dev:admin": "npm --workspace @pos1/admin-web run dev",
+    "dev:customer": "npm --workspace @pos1/customer-web run dev",
+    "dev:kds": "npm --workspace @pos1/kds-web run dev",
+    "dev:waiter": "npm --workspace @pos1/waiter-web run dev",
+    "build": "npm --workspace @pos1/api run build && npm --workspace @pos1/admin-web run build && npm --workspace @pos1/customer-web run build && npm --workspace @pos1/kds-web run build && npm --workspace @pos1/waiter-web run build",
+    "lint": "npm --workspace @pos1/api run lint && npm --workspace @pos1/admin-web run lint && npm --workspace @pos1/customer-web run lint && npm --workspace @pos1/kds-web run lint && npm --workspace @pos1/waiter-web run lint",
+    "db:generate": "npm --workspace @pos1/api run prisma:generate",
+    "db:migrate": "npm --workspace @pos1/api run prisma:migrate"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

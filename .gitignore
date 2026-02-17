@@ -1,0 +1,17 @@
+node_modules
+dist
+.next
+.env
+.env.local
+coverage
+*.log
+.DS_Store
+
+# Android
+apps/android-pos/app/build/
+apps/android-pos/build/
+apps/android-pos/.gradle/
+apps/android-pos/local.properties
+apps/android-pos/app/src/main/java/com/pos1/app/cairo_temp/
+*.apk
+*.aab

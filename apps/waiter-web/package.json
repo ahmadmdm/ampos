@@ -1,0 +1,24 @@
+{
+  "name": "@pos1/waiter-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3005",
+    "build": "next build",
+    "start": "next start -p 3005",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "15.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "socket.io-client": "4.8.0",
+    "@pos1/sdk": "1.0.0",
+    "@pos1/ui": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "@types/node": "22.10.1",
+    "@types/react": "18.3.12"
+  }
+}

@@ -1,0 +1,141 @@
+<resources>
+    <string name="app_name">POS1</string>
+
+    <!-- Navigation -->
+    <string name="nav_cashier">نقاط البيع</string>
+    <string name="nav_tables">الطاولات</string>
+    <string name="nav_orders">الطلبات</string>
+    <string name="nav_kds">المطبخ</string>
+    <string name="nav_waiter">النادل</string>
+    <string name="nav_settings">الإعدادات</string>
+
+    <!-- Auth -->
+    <string name="login_title">تسجيل الدخول</string>
+    <string name="login_subtitle">أدخل بيانات الدخول للمتابعة</string>
+    <string name="email_label">البريد الإلكتروني</string>
+    <string name="password_label">كلمة المرور</string>
+    <string name="login_button">تسجيل الدخول</string>
+    <string name="logout">تسجيل الخروج</string>
+
+    <!-- Common -->
+    <string name="loading">جاري التحميل…</string>
+    <string name="error">خطأ</string>
+    <string name="refresh">تحديث</string>
+    <string name="cancel">إلغاء</string>
+    <string name="confirm">تأكيد</string>
+    <string name="save">حفظ</string>
+    <string name="edit">تعديل</string>
+    <string name="delete">حذف</string>
+    <string name="search_product">ابحث عن منتج…</string>
+    <string name="sar">ر.س</string>
+    <string name="online">متصل</string>
+    <string name="offline">غير متصل</string>
+
+    <!-- Cashier -->
+    <string name="all_categories">الكل</string>
+    <string name="no_products">لا توجد منتجات</string>
+    <string name="load_menu_hint">قم بتحميل القائمة من الإعدادات</string>
+    <string name="cart_title">سلة المشتريات</string>
+    <string name="cart_empty">السلة فارغة</string>
+    <string name="cart_add_hint">اختر منتج لإضافته</string>
+    <string name="clear">مسح</string>
+    <string name="subtotal">المجموع الفرعي</string>
+    <string name="tax">الضريبة</string>
+    <string name="discount">الخصم</string>
+    <string name="total">الإجمالي</string>
+    <string name="kitchen">المطبخ</string>
+    <string name="coupon_placeholder">كود الخصم</string>
+    <string name="apply">تطبيق</string>
+    <string name="order_type_dine_in">محلي</string>
+    <string name="order_type_takeaway">سفري</string>
+    <string name="order_type_pickup">استلام</string>
+    <string name="select_table">اختر طاولة</string>
+
+    <!-- Payment -->
+    <string name="payment">الدفع</string>
+    <string name="total_required">الإجمالي المطلوب</string>
+    <string name="received_amount">المبلغ المستلم</string>
+    <string name="cash">نقدي</string>
+    <string name="card">بطاقة</string>
+    <string name="change">الباقي</string>
+    <string name="remaining">المتبقي</string>
+    <string name="exact_amount">المبلغ</string>
+    <string name="confirm_payment">تأكيد الدفع وطباعة الفاتورة</string>
+
+    <!-- Orders -->
+    <string name="orders_title">الطلبات</string>
+    <string name="no_orders">لا توجد طلبات</string>
+    <string name="status_confirmed">مؤكد</string>
+    <string name="status_in_kitchen">في المطبخ</string>
+    <string name="status_ready">جاهز</string>
+    <string name="status_served">تم التقديم</string>
+    <string name="status_completed">مكتمل</string>
+    <string name="status_voided">ملغي</string>
+    <string name="items_count">عناصر</string>
+    <string name="void_order">إلغاء</string>
+
+    <!-- Tables -->
+    <string name="tables_title">إدارة الطاولات</string>
+    <string name="no_tables">لا توجد طاولات</string>
+    <string name="table_available">متاحة</string>
+    <string name="table_occupied">مشغولة</string>
+    <string name="table_reserved">محجوزة</string>
+    <string name="table_needs_service">تحتاج خدمة</string>
+
+    <!-- KDS -->
+    <string name="kds_title">شاشة المطبخ</string>
+    <string name="kds_active_tickets">تذكرة نشطة</string>
+    <string name="kds_no_tickets">لا توجد تذاكر</string>
+    <string name="kds_sla_breach">تجاوز SLA</string>
+    <string name="kds_new">جديد</string>
+    <string name="kds_cooking">قيد التحضير</string>
+    <string name="kds_start_cooking">بدء التحضير</string>
+
+    <!-- Waiter -->
+    <string name="waiter_title">النادل</string>
+    <string name="waiter_calls">طلبات النادل</string>
+    <string name="waiter_no_calls">لا توجد طلبات</string>
+    <string name="ready_orders">طلبات جاهزة للتقديم</string>
+    <string name="no_ready_orders">لا توجد طلبات جاهزة</string>
+    <string name="acknowledge">استلام</string>
+    <string name="resolve">تم</string>
+    <string name="waiting">بانتظار</string>
+    <string name="acknowledged">مستلم</string>
+    <string name="resolved">تم</string>
+
+    <!-- Settings -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="user_section">المستخدم</string>
+    <string name="device_section">معلومات الجهاز</string>
+    <string name="device_id">معرّف الجهاز</string>
+    <string name="device_code">كود الجهاز</string>
+    <string name="not_registered">غير مسجل</string>
+    <string name="platform">المنصة</string>
+    <string name="version">الإصدار</string>
+    <string name="api_section">إعدادات الاتصال</string>
+    <string name="api_url">رابط الـ API</string>
+    <string name="branch_id">معرّف الفرع</string>
+    <string name="org_id">معرّف المنظمة</string>
+    <string name="register_device">تسجيل الجهاز</string>
+    <string name="sync_section">المزامنة</string>
+    <string name="load_menu">تحميل القائمة</string>
+    <string name="sync_now">مزامنة الآن</string>
+    <string name="print_section">إعدادات الطباعة</string>
+    <string name="printer_ip">عنوان IP الطابعة</string>
+    <string name="printer_port">المنفذ</string>
+    <string name="paper_width">عرض الورق</string>
+    <string name="auto_receipt">طباعة فاتورة تلقائية</string>
+    <string name="auto_kitchen">طباعة تذكرة مطبخ تلقائية</string>
+    <string name="test_print">طباعة تجريبية</string>
+    <string name="stats_section">الإحصائيات</string>
+    <string name="products_loaded">المنتجات المحمّلة</string>
+    <string name="cart_items_count">عناصر السلة</string>
+
+    <!-- Messages -->
+    <string name="order_success">تم إنشاء الطلب بنجاح ✓</string>
+    <string name="order_offline">تم حفظ الطلب محلياً (بدون اتصال)</string>
+    <string name="payment_success">تم الدفع بنجاح ✓</string>
+    <string name="device_registered">تم تسجيل الجهاز ✓</string>
+    <string name="syncing">جاري المزامنة…</string>
+    <string name="invalid_credentials">بيانات الدخول غير صحيحة</string>
+</resources>

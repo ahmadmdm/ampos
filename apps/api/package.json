@@ -1,0 +1,46 @@
+{
+  "name": "@pos1/api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "dev:socket": "tsx src/realtime/socket-server.ts",
+    "dev:webhook-worker": "tsx src/queue/webhook-worker.ts",
+    "build": "npm run prisma:generate && next build",
+    "start": "next start -p 3001",
+    "lint": "next lint",
+    "test": "npx vitest run",
+    "test:watch": "npx vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "seed:demo": "tsx src/scripts/seed-demo.ts"
+  },
+  "dependencies": {
+    "@pos1/types": "1.0.0",
+    "@pos1/utils": "1.0.0",
+    "@prisma/client": "5.20.0",
+    "@types/pdfkit": "^0.17.5",
+    "bcryptjs": "2.4.3",
+    "bullmq": "5.16.0",
+    "dotenv": "^17.3.1",
+    "ioredis": "5.4.1",
+    "jsonwebtoken": "9.0.2",
+    "next": "15.0.0",
+    "pdfkit": "^0.17.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "socket.io": "4.8.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "2.4.6",
+    "@types/jsonwebtoken": "9.0.8",
+    "@types/node": "22.10.1",
+    "@types/react": "18.3.12",
+    "prisma": "5.20.0",
+    "ts-node": "10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

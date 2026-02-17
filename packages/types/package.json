@@ -1,0 +1,7 @@
+{
+  "name": "@pos1/types",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}

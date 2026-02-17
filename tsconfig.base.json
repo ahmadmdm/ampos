@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@pos1/types": ["packages/types/src/index.ts"],
+      "@pos1/sdk": ["packages/sdk/src/index.ts"],
+      "@pos1/utils": ["packages/utils/src/index.ts"]
+    }
+  }
+}
