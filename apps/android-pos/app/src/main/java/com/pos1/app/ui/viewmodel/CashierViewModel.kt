@@ -10,6 +10,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.pos1.app.PosApplication
+import com.pos1.app.data.PosConfig
+import com.pos1.app.data.PosConfigStore
 import com.pos1.app.data.model.ModifierGroupDto
 import com.pos1.app.data.model.ModifierOptionDto
 import com.pos1.app.data.model.ProductDto
@@ -52,6 +54,7 @@ data class SelectedModifier(
 class CashierViewModel : ViewModel() {
 
     private val prefs = PosApplication.instance.securePrefs
+    private val configStore = PosConfigStore(PosApplication.instance.applicationContext)
     private val api = PosApplication.instance.apiClient
     private val eventRepo = PosApplication.instance.eventRepository
 
@@ -99,6 +102,10 @@ class CashierViewModel : ViewModel() {
     // ── Load Products ──
 
     fun loadSnapshot() {
+        if (!prefs.isDeviceRegistered) {
+            message = "الجهاز غير مسجل. افتح الإعدادات واضغط تسجيل الجهاز."
+            return
+        }
         viewModelScope.launch {
             isLoading = true
             runCatching {
@@ -389,6 +396,11 @@ class CashierViewModel : ViewModel() {
     }
 
     fun syncNow(context: Context) {
+        if (!prefs.isDeviceRegistered) {
+            message = "لا يمكن المزامنة قبل تسجيل الجهاز."
+            return
+        }
+        syncLegacyConfigStore()
         WorkManager.getInstance(context).enqueue(
             OneTimeWorkRequestBuilder<PosSyncWorker>().build()
         )
@@ -412,6 +424,7 @@ class CashierViewModel : ViewModel() {
                 val data = result.optJSONObject("data") ?: error("No data")
                 prefs.deviceId = data.getString("deviceId")
                 prefs.deviceToken = data.getString("token")
+                syncLegacyConfigStore()
 
                 loadSnapshot()
                 message = "تم تسجيل الجهاز ✓"
@@ -420,5 +433,18 @@ class CashierViewModel : ViewModel() {
             }
             isLoading = false
         }
+    }
+
+    private fun syncLegacyConfigStore() {
+        configStore.save(
+            PosConfig(
+                apiBaseUrl = prefs.apiBaseUrl,
+                branchId = prefs.branchId,
+                organizationId = prefs.organizationId,
+                deviceCode = prefs.deviceCode,
+                deviceId = prefs.deviceId,
+                deviceToken = prefs.deviceToken
+            )
+        )
     }
 }

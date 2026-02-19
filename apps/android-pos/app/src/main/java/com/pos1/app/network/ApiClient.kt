@@ -282,14 +282,57 @@ class ApiClient(private val prefs: SecurePrefs) {
     }
 
     private fun execute(request: Request): JSONObject {
+        return executeInternal(request, allowAutoRefresh = true)
+    }
+
+    private fun executeInternal(request: Request, allowAutoRefresh: Boolean): JSONObject {
         httpClient.newCall(request).execute().use { response ->
             val raw = response.body?.string() ?: "{}"
             val json = JSONObject(raw)
-            if (!response.isSuccessful) {
-                val errorMsg = json.optString("error", "Request failed: ${response.code}")
-                error(errorMsg)
+
+            if (response.isSuccessful) return json
+
+            // Auto-refresh expired access tokens once, then retry the original request.
+            val canRefresh =
+                allowAutoRefresh &&
+                    response.code == 401 &&
+                    request.header("x-device-token") == null &&
+                    request.header("X-No-Auth") == null &&
+                    !prefs.refreshToken.isNullOrBlank()
+
+            if (canRefresh && tryRefreshTokens()) {
+                return executeInternal(request, allowAutoRefresh = false)
             }
-            return json
+
+            val errorMsg = json.optString("error", "Request failed: ${response.code}")
+            error(errorMsg)
+        }
+    }
+
+    private fun tryRefreshTokens(): Boolean {
+        val refresh = prefs.refreshToken ?: return false
+        val body = JSONObject()
+            .put("refreshToken", refresh)
+            .toString()
+        val request = Request.Builder()
+            .url("${prefs.apiBaseUrl}/api/auth/refresh")
+            .post(body.toRequestBody(jsonMediaType))
+            .header("X-No-Auth", "true")
+            .build()
+
+        return runCatching {
+            executeInternal(request, allowAutoRefresh = false)
+        }.mapCatching { result ->
+            val data = result.optJSONObject("data") ?: return@mapCatching false
+            val newAccess = data.optString("accessToken", "")
+            val newRefresh = data.optString("refreshToken", "")
+            if (newAccess.isBlank() || newRefresh.isBlank()) return@mapCatching false
+            prefs.accessToken = newAccess
+            prefs.refreshToken = newRefresh
+            true
+        }.getOrElse {
+            prefs.clearAuth()
+            false
         }
     }
 }
