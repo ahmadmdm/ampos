@@ -69,6 +69,7 @@ model Organization {
   auditLogs   AuditLog[]
   coupons     Coupon[]
   loyaltyProgram LoyaltyProgram?
+  tenantMeta  TenantMeta?
 
   @@index([name])
 }
@@ -733,6 +734,29 @@ model ZatcaConfig {
   updatedAt           DateTime @updatedAt
 
   @@index([organizationId])
+}
+
+// ─── SaaS Subscription Metadata (managed by super-admin service) ───
+
+model TenantMeta {
+  id                 String   @id @default(cuid())
+  organizationId     String   @unique
+  plan               String   @default("trial")  // trial | starter | professional | enterprise
+  maxDevices         Int      @default(3)
+  subscriptionStart  DateTime?
+  subscriptionEnd    DateTime?
+  isSuspended        Boolean  @default(false)
+  suspendReason      String?
+  contactEmail       String?
+  contactPhone       String?
+  notes              String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization       Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([isSuspended])
+  @@index([subscriptionEnd])
 }
 
 // ─── Coupons & Promotions ───

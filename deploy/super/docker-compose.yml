@@ -1,0 +1,15 @@
+services:
+  super-admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ampos-super
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:3200:3200"   # only reachable via Caddy on the host
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3200/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

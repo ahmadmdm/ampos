@@ -1,325 +1,341 @@
 import SwiftUI
 
+// MARK: ─ Waiter Screen (Ramotion Dark Premium)
+
 struct WaiterScreen: View {
     @StateObject private var viewModel: WaiterViewModel
     @State private var refreshTimer: Timer?
-    
+
     init(apiClient: ApiClient) {
         _viewModel = StateObject(wrappedValue: WaiterViewModel(apiClient: apiClient))
     }
-    
-    var pendingCallsCount: Int {
+
+    private var pendingCount: Int {
         viewModel.waiterCalls.filter { $0.status == "CREATED" }.count
     }
-    
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("النادل")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("\(pendingCallsCount) طلب مفتوح • \(viewModel.readyOrders.count) طلب جاهز")
-                        .font(.caption)
-                        .foregroundColor(PosColors.Slate500)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    Task {
-                        await viewModel.refresh()
-                    }
-                }) {
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
+        ZStack {
+            Color(hex: "F4F6FF").ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // ── Header ──────────────────────────────────────────
+                HStack {
+                    // Refresh
+                    Button {
+                        Task { await viewModel.refresh() }
+                    } label: {
                         Image(systemName: "arrow.clockwise")
-                            .foregroundColor(PosColors.Brand600)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(10)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("النادل")
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundColor(Color(hex: "0F172A"))
+
+                        HStack(spacing: 10) {
+                            if pendingCount > 0 {
+                                TableStatBadge(count: pendingCount,   label: "طلب مفتوح",  color: Color(hex: "EF4444"))
+                            }
+                            TableStatBadge(count: viewModel.readyOrders.count, label: "جاهز",        color: Color(hex: "10B981"))
+                        }
                     }
                 }
-            }
-            .padding(16)
-            
-            // Main Content
-            HStack(spacing: 16) {
-                // Left: Waiter Calls
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "bell")
-                            .foregroundColor(PosColors.Warning)
-                            .font(.system(size: 22))
-                        
-                        Text("طلبات النادل")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                        
-                        if pendingCallsCount > 0 {
-                            Text("\(pendingCallsCount)")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(PosColors.Danger)
-                                .frame(width: 24, height: 24)
-                                .background(PosColors.DangerBg)
-                                .clipShape(Circle())
-                        }
-                    }
-                    
-                    if viewModel.waiterCalls.isEmpty {
-                        VStack {
-                            Spacer()
-                            
-                            Image(systemName: "bell.slash")
-                                .font(.system(size: 48))
-                                .foregroundColor(PosColors.Slate300)
-                            Text("لا توجد طلبات")
-                                .foregroundColor(PosColors.Slate400)
-                            
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 8) {
-                                ForEach(viewModel.waiterCalls) { call in
-                                    WaiterCallCard(
-                                        call: call,
-                                        onAck: {
-                                            Task {
-                                                await viewModel.ackCall(callId: call.id)
-                                            }
-                                        },
-                                        onResolve: {
-                                            Task {
-                                                await viewModel.resolveCall(callId: call.id)
-                                            }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 16)
+
+                // ── Two-column layout ────────────────────────────────
+                HStack(alignment: .top, spacing: 14) {
+                    // Left: Waiter Calls
+                    WaiterPanel(
+                        title: "طلبات النادل",
+                        icon: "bell.fill",
+                        iconColor: Color(hex: "F59E0B"),
+                        badge: pendingCount > 0 ? "\(pendingCount)" : nil
+                    ) {
+                        if viewModel.waiterCalls.isEmpty {
+                            EmptyPanelPlaceholder(icon: "bell.slash", text: "لا توجد طلبات")
+                        } else {
+                            ScrollView(showsIndicators: false) {
+                                LazyVStack(spacing: 10) {
+                                    ForEach(viewModel.waiterCalls) { call in
+                                        WaiterCallCard(call: call) {
+                                            Task { await viewModel.ackCall(callId: call.id) }
+                                        } onResolve: {
+                                            Task { await viewModel.resolveCall(callId: call.id) }
                                         }
-                                    )
+                                    }
                                 }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
                             }
-                            .padding(.horizontal, 8)
+                        }
+                    }
+
+                    // Right: Ready Orders
+                    WaiterPanel(
+                        title: "جاهز للتقديم",
+                        icon: "fork.knife",
+                        iconColor: Color(hex: "10B981"),
+                        badge: viewModel.readyOrders.isEmpty ? nil : "\(viewModel.readyOrders.count)"
+                    ) {
+                        if viewModel.readyOrders.isEmpty {
+                            EmptyPanelPlaceholder(icon: "tray", text: "لا توجد طلبات جاهزة")
+                        } else {
+                            ScrollView(showsIndicators: false) {
+                                LazyVStack(spacing: 10) {
+                                    ForEach(viewModel.readyOrders) { order in
+                                        ReadyOrderCard(order: order)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
+                            }
                         }
                     }
                 }
-                .frame(maxWidth: .infinity)
-                
-                // Divider
-                Rectangle()
-                    .fill(PosColors.Slate200)
-                    .frame(width: 1)
-                
-                // Right: Ready Orders
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "fork.knife")
-                            .foregroundColor(PosColors.Success)
-                            .font(.system(size: 22))
-                        
-                        Text("طلبات جاهزة للتقديم")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                    }
-                    
-                    if viewModel.readyOrders.isEmpty {
-                        VStack {
-                            Spacer()
-                            
-                            Image(systemName: "fork.knife")
-                                .font(.system(size: 48))
-                                .foregroundColor(PosColors.Slate300)
-                            Text("لا توجد طلبات جاهزة")
-                                .foregroundColor(PosColors.Slate400)
-                            
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 8) {
-                                ForEach(viewModel.readyOrders) { order in
-                                    ReadyOrderCard(order: order)
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .frame(maxHeight: .infinity)
             }
-            .frame(maxHeight: .infinity)
-            .padding(.horizontal, 16)
         }
-        .navigationBarHidden(true)
-        .onAppear {
-            startAutoRefresh()
-        }
-        .onDisappear {
-            stopAutoRefresh()
-        }
-        .task {
-            await viewModel.refresh()
-        }
+        .onAppear { startAutoRefresh() }
+        .onDisappear { stopAutoRefresh() }
+        .task { await viewModel.refresh() }
     }
-    
+
     private func startAutoRefresh() {
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
-            Task {
-                await viewModel.refresh()
-            }
+            Task { await viewModel.refresh() }
         }
     }
-    
     private func stopAutoRefresh() {
         refreshTimer?.invalidate()
         refreshTimer = nil
     }
 }
 
-// MARK: - Waiter Call Card
-struct WaiterCallCard: View {
+// MARK: ─ Waiter Panel Container
+
+private struct WaiterPanel<Content: View>: View {
+    let title: String
+    let icon: String
+    let iconColor: Color
+    let badge: String?
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Panel header
+            HStack(spacing: 8) {
+                Spacer()
+                Text(title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(Color(hex: "1E293B"))
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundColor(iconColor)
+                if let badge = badge {
+                    Text(badge)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(iconColor)
+                        .frame(width: 22, height: 22)
+                        .background(iconColor.opacity(0.15))
+                        .clipShape(Circle())
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(iconColor.opacity(0.06))
+
+            content
+                .frame(maxHeight: .infinity)
+        }
+        .background(Color(hex: "FFFFFF"))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.black.opacity(0.07), lineWidth: 1)
+        )
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: ─ Waiter Call Card
+
+private struct WaiterCallCard: View {
     let call: WaiterCallUi
     let onAck: () -> Void
     let onResolve: () -> Void
-    
-    var isUrgent: Bool { call.elapsedMin > 5 }
-    var isPending: Bool { call.status == "CREATED" }
-    
-    var statusText: String {
+
+    private var isPending: Bool { call.status == "CREATED" }
+    private var isUrgent: Bool { call.elapsedMin > 5 }
+
+    private var statusColor: Color {
         switch call.status {
-        case "CREATED": return "بانتظار"
-        case "ACKNOWLEDGED": return "مستلم"
-        case "RESOLVED": return "تم"
-        default: return call.status
+        case "CREATED":      return isUrgent ? Color(hex: "EF4444") : Color(hex: "F59E0B")
+        case "ACKNOWLEDGED": return Color(hex: "3B82F6")
+        default:             return Color(hex: "10B981")
         }
     }
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                // Table Badge
-                Text(call.tableCode)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(isPending ? PosColors.Warning : PosColors.Success)
-                    .frame(width: 40, height: 40)
-                    .background(isPending ? PosColors.WarningBg : PosColors.SuccessBg)
-                    .cornerRadius(10)
-                
-                VStack(alignment: .leading, spacing: 2) {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                // Table badge
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(statusColor.opacity(0.12))
+                        .frame(width: 48, height: 48)
+                    Text(call.tableCode)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(statusColor)
+                }
+
+                VStack(alignment: .trailing, spacing: 4) {
                     Text("طاولة \(call.tableCode)")
                         .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(hex: "0F172A"))
                     Text(call.reason)
                         .font(.caption)
-                        .foregroundColor(PosColors.Slate500)
+                        .foregroundColor(Color(hex: "94A3B8"))
                 }
-                
+
                 Spacer()
-                
+
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("\(call.elapsedMin) د")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(
-                            !isPending ? PosColors.Success :
-                            isUrgent ? PosColors.Danger :
-                            PosColors.Warning
-                        )
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(
-                            !isPending ? PosColors.SuccessBg :
-                            isUrgent ? PosColors.DangerBg :
-                            PosColors.WarningBg
-                        )
-                        .cornerRadius(6)
-                    
-                    Text(statusText)
-                        .font(.caption)
-                        .foregroundColor(PosColors.Slate400)
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill").font(.system(size: 10))
+                        Text("\(call.elapsedMin)د")
+                            .font(.system(size: 12, weight: .bold))
+                            .monospacedDigit()
+                    }
+                    .foregroundColor(statusColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(statusColor.opacity(0.12))
+                    .cornerRadius(6)
                 }
             }
-            
-            // Action Buttons
+
             if isPending || call.status == "ACKNOWLEDGED" {
-                Divider()
-                
                 HStack(spacing: 8) {
                     if isPending {
                         Button(action: onAck) {
                             Text("استلام")
-                                .font(.caption)
-                                .foregroundColor(PosColors.Brand600)
-                                .frame(maxWidth: .infinity, minHeight: 36)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(PosColors.Violet400)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(PosColors.Violet600.opacity(0.12))
+                                .cornerRadius(9)
+                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(PosColors.Violet600.opacity(0.25), lineWidth: 1))
                         }
-                        .buttonStyle(.bordered)
-                        .cornerRadius(8)
+                        .buttonStyle(.plain)
                     }
-                    
                     Button(action: onResolve) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
                             Image(systemName: "checkmark")
-                                .font(.caption)
+                                .font(.system(size: 11, weight: .bold))
                             Text("تم")
-                                .font(.caption)
+                                .font(.system(size: 12, weight: .bold))
                         }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .background(PosColors.Success)
-                        .cornerRadius(8)
+                        .foregroundColor(Color(hex: "10B981"))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color(hex: "10B981").opacity(0.12))
+                        .cornerRadius(9)
+                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color(hex: "10B981").opacity(0.25), lineWidth: 1))
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
-        .padding(14)
-        .background(
-            isPending ? Color.white : PosColors.Slate100.opacity(0.5)
+        .padding(12)
+        .background(Color(hex: "F8F9FF"))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(statusColor.opacity(isUrgent && isPending ? 0.3 : 0.07), lineWidth: 1)
         )
-        .cornerRadius(14)
-        .shadow(color: isPending ? PosColors.Slate200 : Color.clear, radius: isPending ? 2 : 0, x: 0, y: 1)
     }
 }
 
-// MARK: - Ready Order Card
-struct ReadyOrderCard: View {
+// MARK: ─ Ready Order Card
+
+private struct ReadyOrderCard: View {
     let order: ReadyOrderUi
-    
+
     var body: some View {
-        HStack {
-            // Restaurant Icon
-            Image(systemName: "fork.knife")
-                .font(.system(size: 22))
-                .foregroundColor(PosColors.Success)
-                .frame(width: 40, height: 40)
-                .background(PosColors.Success.opacity(0.2))
-                .cornerRadius(10)
-            
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(hex: "10B981").opacity(0.12))
+                    .frame(width: 46, height: 46)
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color(hex: "10B981"))
+            }
+
+            VStack(alignment: .trailing, spacing: 3) {
                 Text(order.orderNo)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(PosColors.Success)
+                    .foregroundColor(Color(hex: "0F172A"))
                 Text("طاولة \(order.tableCode)")
                     .font(.caption)
-                    .foregroundColor(PosColors.Slate500)
+                    .foregroundColor(Color(hex: "94A3B8"))
             }
-            
+
             Spacer()
-            
+
             Text("جاهز")
-                .font(.caption)
-                .fontWeight(.bold)
+                .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.white)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(PosColors.Success)
+                .background(Color(hex: "10B981"))
                 .cornerRadius(8)
         }
-        .padding(14)
-        .background(PosColors.SuccessBg)
-        .cornerRadius(14)
-        .shadow(color: PosColors.Slate200, radius: 1, x: 0, y: 1)
+        .padding(12)
+        .background(Color(hex: "F8F9FF"))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color(hex: "10B981").opacity(0.12), lineWidth: 1)
+        )
     }
 }
+
+// MARK: ─ Empty Placeholder
+
+private struct EmptyPanelPlaceholder: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Image(systemName: icon)
+                .font(.system(size: 36))
+                .foregroundColor(Color(hex: "E2E8F0"))
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(Color(hex: "94A3B8"))
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: ─ Shared Stat Badge (reused across screens)
+// (Defined in TablesScreen.swift)
 
 #Preview {
     WaiterScreen(apiClient: ApiClient(configStore: PosConfigStore()))

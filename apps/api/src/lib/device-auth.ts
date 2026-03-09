@@ -8,5 +8,11 @@ export async function assertValidDevice(deviceId: string, token: string) {
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
   if (tokenHash !== device.authTokenHash) throw new Error("INVALID_DEVICE_TOKEN");
 
+  // Update lastSeenAt for real-time presence tracking (fire-and-forget)
+  prisma.device
+    .update({ where: { id: deviceId }, data: { lastSeenAt: new Date() } })
+    .catch(() => {/* non-critical */});
+
   return device;
 }
+

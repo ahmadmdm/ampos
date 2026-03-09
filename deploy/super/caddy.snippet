@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Caddy snippet for super.yourdomain.com → ampos-super container
+#
+# Paste this block into your Caddyfile on the server (206.168.214.225).
+# Replace "super.yourdomain.com" with your actual subdomain.
+# Caddy will automatically provision a TLS certificate via Let's Encrypt.
+# ─────────────────────────────────────────────────────────────────────────────
+
+super.yourdomain.com {
+    # Restrict API paths — no directory traversal possible
+    @api path /auth/* /tenants/* /health
+
+    handle @api {
+        reverse_proxy localhost:3200 {
+            # Pass real IP through to the Express app
+            header_up X-Forwarded-For  {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Reject all other paths (no static assets served here)
+    respond "Not Found" 404
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deployment steps on the server:
+#
+#   1. Copy deploy/super/ to /home/ampos-super on the server
+#   2. cp .env.example .env && nano .env   (fill in DATABASE_URL, secrets)
+#   3. docker compose up -d --build
+#   4. Reload Caddy:  caddy reload --config /etc/caddy/Caddyfile
+# ─────────────────────────────────────────────────────────────────────────────

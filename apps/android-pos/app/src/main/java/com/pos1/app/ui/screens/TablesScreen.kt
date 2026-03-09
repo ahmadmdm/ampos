@@ -1,20 +1,9 @@
 package com.pos1.app.ui.screens
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -25,22 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +26,269 @@ import androidx.compose.ui.unit.sp
 import com.pos1.app.ui.theme.PosColors
 import com.pos1.app.ui.viewmodel.TableWithStatus
 import com.pos1.app.ui.viewmodel.TablesViewModel
+
+/* ═══════════════════════════════════════════════════════════════
+   Tables Screen – Ramotion Dark Premium
+   ═══════════════════════════════════════════════════════════════ */
+
+private fun statusAccent(status: String): Color = when (status) {
+    "OCCUPIED"      -> PosColors.Warning
+    "RESERVED"      -> PosColors.Info
+    "NEEDS_SERVICE" -> PosColors.Danger
+    else            -> PosColors.Success
+}
+
+private fun statusLabel(status: String): String = when (status) {
+    "OCCUPIED"      -> "مشغولة"
+    "RESERVED"      -> "محجوزة"
+    "NEEDS_SERVICE" -> "تحتاج خدمة"
+    else            -> "متاحة"
+}
+
+@Composable
+fun TablesScreen(vm: TablesViewModel) {
+    var selectedArea by remember { mutableStateOf("الكل") }
+    LaunchedEffect(Unit) { vm.loadTables() }
+
+    val filtered = remember(vm.tables, selectedArea) {
+        if (selectedArea == "الكل") vm.tables
+        else vm.tables.filter { it.table.area?.nameAr == selectedArea }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PosColors.Void),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // ── Header ───────────────────────────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    // Refresh button
+                    IconButton(
+                        onClick   = { vm.loadTables() },
+                        modifier  = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.05f)),
+                    ) {
+                        Icon(Icons.Default.Refresh, null, tint = PosColors.Slate600, modifier = Modifier.size(18.dp))
+                    }
+
+                    // Title + stats
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("إدارة الطاولات", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = PosColors.Slate900)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            DarkStatBadge(vm.tables.count { it.status == "AVAILABLE" }, "متاحة",  PosColors.Success)
+                            DarkStatBadge(vm.tables.count { it.status == "OCCUPIED" },  "مشغولة", PosColors.Warning)
+                            val svc = vm.tables.count { it.status == "NEEDS_SERVICE" }
+                            if (svc > 0) DarkStatBadge(svc, "تحتاج خدمة", PosColors.Danger)
+                        }
+                    }
+                }
+
+                // Area filter
+                if (vm.areas.size > 1) {
+                    Spacer(Modifier.height(14.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(vm.areas) { area ->
+                            val sel = area == selectedArea
+                            Surface(
+                                onClick = { selectedArea = area },
+                                shape   = RoundedCornerShape(20.dp),
+                                color   = if (sel) PosColors.Violet600.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.05f),
+                                modifier = Modifier.border(
+                                    1.dp,
+                                    if (sel) PosColors.Violet600.copy(alpha = 0.4f) else Color.Transparent,
+                                    RoundedCornerShape(20.dp),
+                                ),
+                            ) {
+                                Text(
+                                    area,
+                                    modifier   = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                                    style      = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                    color      = if (sel) PosColors.Violet400 else PosColors.Slate500,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Content ──────────────────────────────────────────
+            when {
+                vm.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = PosColors.Violet500)
+                }
+                filtered.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("لا توجد طاولات", style = MaterialTheme.typography.titleMedium, color = PosColors.Slate400)
+                }
+                else -> LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 200.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                    verticalArrangement   = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    items(filtered, key = { it.table.id }) { table ->
+                        DarkTableCard(table)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ─── Stat Badge ─── */
+
+@Composable
+private fun DarkStatBadge(count: Int, label: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(color.copy(alpha = 0.1f))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(color))
+        Text("$count", fontWeight = FontWeight.Bold, color = color,       fontSize = 13.sp)
+        Text(label,   color      = color.copy(alpha = 0.7f),              fontSize = 12.sp)
+    }
+}
+
+/* ─── Table Card ─── */
+
+@Composable
+private fun DarkTableCard(table: TableWithStatus) {
+    val accent = statusAccent(table.status)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, Color.Black.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .background(PosColors.Surface)
+            .clickable { },
+    ) {
+        // Colored top strip
+        Box(Modifier.fillMaxWidth().height(3.dp).background(accent))
+
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.End,
+        ) {
+            // Top row: status badge + table code box
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.Top,
+            ) {
+                // Status badge
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = accent.copy(alpha = 0.12f),
+                ) {
+                    Text(
+                        statusLabel(table.status),
+                        modifier   = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                        style      = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color      = accent,
+                    )
+                }
+
+                // Table code box
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = accent.copy(alpha = 0.1f),
+                    modifier = Modifier.size(58.dp, 52.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            table.table.code,
+                            style      = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color      = accent,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Area name
+            table.table.area?.nameAr?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = PosColors.Slate400)
+                Spacer(Modifier.height(4.dp))
+            }
+
+            // Seat row
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.People, null, Modifier.size(14.dp), tint = PosColors.Slate400)
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "${table.guestCount}/${table.table.seats}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PosColors.Slate400,
+                )
+            }
+
+            // Active order
+            table.activeOrder?.let { order ->
+                Spacer(Modifier.height(10.dp))
+                Divider(color = Color.Black.copy(alpha = 0.05f))
+                Spacer(Modifier.height(10.dp))
+
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    // Elapsed
+                    if (table.elapsedMin > 0) {
+                        Text(
+                            "${table.elapsedMin} د",
+                            style      = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = if (table.elapsedMin > 30) PosColors.Danger else PosColors.Slate500,
+                        )
+                    }
+                    // Amount
+                    Text(
+                        "%.0f ر.س".format(order.grandTotal),
+                        style      = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color      = PosColors.Amber400,
+                    )
+                }
+
+                Text(
+                    "#${order.orderNo}",
+                    modifier = Modifier.fillMaxWidth(),
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = PosColors.Slate400,
+                )
+            }
+        }
+    }
+}
+
 
 /* ═══════════════════════════════════════════════════════════════
    Tables Screen — Real API tables with live order status

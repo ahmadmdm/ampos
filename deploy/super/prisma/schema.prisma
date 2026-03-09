@@ -1,0 +1,68 @@
+# ─── Minimal Prisma schema for the super-admin service ────────────────────────
+# This schema is a READ/WRITE subset of the main apps/api/prisma/schema.prisma.
+# It connects to the SAME database but only declares the models the super-admin
+# service needs so it can generate a typed Prisma client.
+# DO NOT run "prisma migrate" from here — all migrations are owned by apps/api.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branches   Branch[]
+  devices    Device[]  @relation("OrgDevices")
+  tenantMeta TenantMeta?
+}
+
+model Branch {
+  id             String @id @default(cuid())
+  organizationId String
+  code           String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  devices        Device[]
+}
+
+model Device {
+  id          String   @id @default(cuid())
+  branchId    String
+  code        String
+  name        String
+  platform    String
+  lastSeenAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  org         Organization @relation("OrgDevices", fields: [branchId], references: [id])
+}
+
+model TenantMeta {
+  id                String   @id @default(cuid())
+  organizationId    String   @unique
+  plan              String   @default("trial")
+  maxDevices        Int      @default(3)
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+  isSuspended       Boolean  @default(false)
+  suspendReason     String?
+  contactEmail      String?
+  contactPhone      String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization      Organization @relation(fields: [organizationId], references: [id])
+}

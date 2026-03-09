@@ -10,6 +10,23 @@ import { writeAudit } from "@/src/lib/audit";
 import PDFDocument from "pdfkit";
 import { generateZatcaInvoice, retryZatcaSubmission, ZatcaStatus } from "@/src/zatca";
 import { decodeQrTlv } from "@/src/zatca/qr-tlv";
+import { prepareText } from "@/src/lib/arabic-text";
+
+// ── Arabic font paths (Amiri — downloaded by Dockerfile) ──────────────────────
+const FONT_DIR    = path.join(process.cwd(), "fonts");
+const AMIRI_REG   = path.join(FONT_DIR, "Amiri-Regular.ttf");
+const AMIRI_BOLD  = path.join(FONT_DIR, "Amiri-Bold.ttf");
+
+/** Register Amiri once when first needed; falls back gracefully to Helvetica */
+let arabicFontsRegistered = false;
+function registerArabicFonts(doc: InstanceType<typeof PDFDocument>): boolean {
+  if (arabicFontsRegistered) return true;
+  if (!fs.existsSync(AMIRI_REG)) return false;
+  doc.registerFont("Amiri",     AMIRI_REG);
+  doc.registerFont("Amiri-Bold", fs.existsSync(AMIRI_BOLD) ? AMIRI_BOLD : AMIRI_REG);
+  arabicFontsRegistered = true;
+  return true;
+}
 
 function ensurePdfKitDataFiles() {
   const targetDir = path.join(
@@ -56,170 +73,153 @@ function buildInvoicePdf(order: any, branch: any, zatcaData?: {
       bufferPages: true,
     });
 
+    // Register Amiri Arabic font; falls back to Helvetica if not downloaded yet
+    const hasArabic  = registerArabicFonts(doc);
+    const fontAr     = hasArabic ? "Amiri"      : "Helvetica";
+    const fontArBold = hasArabic ? "Amiri-Bold" : "Helvetica-Bold";
+
+    /** Selects the Arabic or bold-Arabic font on the document */
+    const useAr = (bold = false) => doc.font(bold ? fontArBold : fontAr);
+
+    /** Reshape + reverse Arabic text for LTR PDFKit rendering */
+    const ar = (text: string) => (hasArabic ? prepareText(text) : text);
+
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("end",  () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
     const w = 206.77; // usable width
-    const cx = w / 2 + 10; // center x
 
-    // ─── Header ───
-    doc.fontSize(14).font("Helvetica-Bold")
-      .text(branch.name || "POS1", 10, 14, { width: w, align: "center" });
-    doc.fontSize(8).font("Helvetica")
-      .text(`Branch: ${branch.code}`, 10, 32, { width: w, align: "center" });
-
+    // ─── Header ──────────────────────────────────────────────────────────────
+    useAr(true);
+    doc.fontSize(13).text(ar(branch.name || "POS1"), 10, 14, { width: w, align: "right" });
+    doc.fontSize(7.5).font("Helvetica")
+       .text(`Branch: ${branch.code}`, 10, 32, { width: w, align: "center" });
     doc.moveTo(10, 46).lineTo(w + 10, 46).lineWidth(0.5).stroke();
 
-    // ─── Invoice info ───
+    // ─── Invoice info ─────────────────────────────────────────────────────────
     let y = 52;
-    doc.fontSize(11).font("Helvetica-Bold")
-      .text("INVOICE / فاتورة", 10, y, { width: w, align: "center" });
+    useAr(true);
+    doc.fontSize(10).text(ar("فاتورة ضريبية / TAX INVOICE"), 10, y, { width: w, align: "center" });
     y += 18;
 
-    const invoiceNo = order.orderNo;
     const dateStr = new Date(order.createdAt).toLocaleString("en-SA", {
       dateStyle: "short",
       timeStyle: "short",
     });
 
-    doc.fontSize(8).font("Helvetica");
-    doc.text(`Invoice #: ${invoiceNo}`, 10, y);
-    y += 12;
-    doc.text(`Date: ${dateStr}`, 10, y);
-    y += 12;
-    doc.text(`Order Type: ${order.type}`, 10, y);
-    y += 12;
-    if (order.table) {
-      doc.text(`Table: ${order.table.code}`, 10, y);
-      y += 12;
-    }
+    doc.fontSize(7.5).font("Helvetica");
+    doc.text(`Invoice #: ${order.orderNo}`, 10, y); y += 12;
+    doc.text(`Date: ${dateStr}`,             10, y); y += 12;
+    doc.text(`Type: ${order.type}`,          10, y); y += 12;
+    if (order.table) { doc.text(`Table: ${order.table.code}`, 10, y); y += 12; }
 
     doc.moveTo(10, y + 2).lineTo(w + 10, y + 2).dash(2, { space: 2 }).stroke();
-    doc.undash();
-    y += 8;
+    doc.undash(); y += 8;
 
-    // ─── Items header ───
-    doc.font("Helvetica-Bold").fontSize(8);
-    doc.text("Item", 10, y, { width: 100 });
-    doc.text("Qty", 110, y, { width: 30, align: "center" });
-    doc.text("Price", 140, y, { width: 40, align: "right" });
-    doc.text("Total", w - 30, y, { width: 40, align: "right" });
+    // ─── Items header ─────────────────────────────────────────────────────────
+    doc.font("Helvetica-Bold").fontSize(7.5);
+    doc.text("Qty",   10,     y, { width: 25, align: "center" });
+    doc.text("Price", 35,     y, { width: 45, align: "right"  });
+    doc.text("Total", 80,     y, { width: 45, align: "right"  });
+    useAr(true);
+    doc.fontSize(7.5).text(ar("الصنف"), 125, y, { width: w - 115, align: "right" });
     y += 12;
-    doc.moveTo(10, y).lineTo(w + 10, y).lineWidth(0.3).stroke();
-    y += 4;
+    doc.moveTo(10, y).lineTo(w + 10, y).lineWidth(0.3).stroke(); y += 4;
 
-    // ─── Items ───
-    doc.font("Helvetica").fontSize(7.5);
+    // ─── Items ───────────────────────────────────────────────────────────────
     for (const item of order.items) {
-      if (y > 540) {
-        doc.addPage();
-        y = 10;
-      }
-      const name = item.itemNameAr || "—";
-      const qty = Number(item.qty);
-      const price = Number(item.unitPrice).toFixed(2);
+      if (y > 540) { doc.addPage(); y = 10; }
+
+      const qty       = Number(item.qty);
+      const price     = Number(item.unitPrice).toFixed(2);
       const lineTotal = Number(item.lineTotal).toFixed(2);
 
-      doc.text(name, 10, y, { width: 100 });
-      doc.text(`${qty}`, 110, y, { width: 30, align: "center" });
-      doc.text(price, 140, y, { width: 40, align: "right" });
-      doc.text(lineTotal, w - 30, y, { width: 40, align: "right" });
-      y += 12;
+      // Item name — Arabic, right-aligned
+      useAr(false);
+      doc.fontSize(7.5).text(ar(item.itemNameAr || "—"), 125, y, { width: w - 115, align: "right" });
 
-      // Render modifiers
+      // Numbers — Helvetica, left side
+      doc.font("Helvetica").fontSize(7.5);
+      doc.text(`${qty}`, 10,  y, { width: 25, align: "center" });
+      doc.text(price,    35,  y, { width: 45, align: "right"  });
+      doc.text(lineTotal, 80, y, { width: 45, align: "right"  });
+      y += 13;
+
       if (item.modifiers?.length) {
-        doc.font("Helvetica").fontSize(6.5).fillColor("#555");
+        doc.fillColor("#555");
         for (const mod of item.modifiers) {
-          if (y > 540) {
-            doc.addPage();
-            y = 10;
-          }
-          const delta = Number(mod.priceDelta);
+          if (y > 540) { doc.addPage(); y = 10; }
+          const delta    = Number(mod.priceDelta);
           const deltaStr = delta !== 0 ? ` (+${delta.toFixed(2)})` : "";
-          doc.text(`  + ${mod.nameAr}${deltaStr}`, 14, y, { width: 120 });
+          useAr(false);
+          doc.fontSize(6.5).text(ar(mod.nameAr) + deltaStr, 14, y, { width: w - 24, align: "right" });
           y += 10;
         }
         doc.fillColor("#000");
       }
     }
 
-    // ─── Separator ───
+    // ─── Separator ───────────────────────────────────────────────────────────
     doc.moveTo(10, y + 2).lineTo(w + 10, y + 2).dash(2, { space: 2 }).stroke();
-    doc.undash();
-    y += 8;
+    doc.undash(); y += 8;
 
-    // ─── Totals ───
-    doc.font("Helvetica").fontSize(8);
-    const drawTotal = (label: string, val: string) => {
-      doc.text(label, 10, y, { width: 120 });
-      doc.text(val, 130, y, { width: w - 120, align: "right" });
-      y += 13;
+    // ─── Totals ───────────────────────────────────────────────────────────────
+    const drawTotal = (labelAr: string, val: string, bold = false) => {
+      const fs = bold ? 9 : 7.5;
+      if (bold) doc.moveTo(10, y - 2).lineTo(w + 10, y - 2).lineWidth(0.5).stroke();
+      useAr(bold);
+      doc.fontSize(fs).text(ar(labelAr), 10, y, { width: 120, align: "right" });
+      doc.font("Helvetica").fontSize(fs).text(val, 130, y, { width: w - 120, align: "right" });
+      y += bold ? 15 : 12;
     };
 
-    drawTotal("Subtotal المجموع", `${Number(order.subtotal).toFixed(2)} SAR`);
-    drawTotal("Tax ضريبة", `${Number(order.taxAmount).toFixed(2)} SAR`);
+    drawTotal("المجموع الفرعي",       `${Number(order.subtotal).toFixed(2)} SAR`);
+    drawTotal("ضريبة القيمة المضافة", `${Number(order.taxAmount).toFixed(2)} SAR`);
+    if (Number(order.serviceCharge) > 0)
+      drawTotal("رسوم الخدمة",        `${Number(order.serviceCharge).toFixed(2)} SAR`);
+    if (Number(order.discountAmount) > 0)
+      drawTotal("خصم",                `-${Number(order.discountAmount).toFixed(2)} SAR`);
+    drawTotal("الإجمالي",             `${Number(order.totalAmount).toFixed(2)} SAR`, true);
 
-    if (Number(order.serviceCharge) > 0) {
-      drawTotal("Service خدمة", `${Number(order.serviceCharge).toFixed(2)} SAR`);
-    }
-    if (Number(order.discountAmount) > 0) {
-      drawTotal("Discount خصم", `-${Number(order.discountAmount).toFixed(2)} SAR`);
-    }
-
-    doc.moveTo(10, y).lineTo(w + 10, y).lineWidth(0.5).stroke();
-    y += 6;
-
-    doc.font("Helvetica-Bold").fontSize(11);
-    drawTotal("Total الإجمالي", `${Number(order.totalAmount).toFixed(2)} SAR`);
-
-    // ─── Payment info ───
+    // ─── Payment ──────────────────────────────────────────────────────────────
     if (order.payments?.length) {
-      y += 4;
-      doc.font("Helvetica").fontSize(7);
+      y += 2; doc.font("Helvetica").fontSize(7);
       for (const p of order.payments) {
         doc.text(`Payment: ${p.method} — ${Number(p.amount).toFixed(2)} SAR (${p.status})`, 10, y, { width: w });
         y += 10;
       }
     }
 
-    // ─── ZATCA Compliance Footer ───
+    // ─── ZATCA Compliance Footer ──────────────────────────────────────────────
     if (zatcaData?.zatcaUuid) {
       y += 4;
-      doc.moveTo(10, y).lineTo(w + 10, y).lineWidth(0.3).stroke();
-      y += 6;
-      doc.font("Helvetica-Bold").fontSize(7)
-        .text("ZATCA E-Invoice | فاتورة إلكترونية", 10, y, { width: w, align: "center" });
-      y += 10;
+      doc.moveTo(10, y).lineTo(w + 10, y).lineWidth(0.3).stroke(); y += 6;
+      useAr(true);
+      doc.fontSize(7).text(ar("فاتورة إلكترونية متوافقة مع هيئة الزكاة"),
+        10, y, { width: w, align: "center" }); y += 10;
       doc.font("Helvetica").fontSize(6);
-      doc.text(`UUID: ${zatcaData.zatcaUuid}`, 10, y, { width: w });
-      y += 8;
-      if (zatcaData.icv) {
-        doc.text(`ICV: ${zatcaData.icv}`, 10, y, { width: w });
-        y += 8;
-      }
-      doc.text(`Hash: ${zatcaData.invoiceHash?.substring(0, 32)}...`, 10, y, { width: w });
-      y += 8;
-      doc.text(`Status: ${zatcaData.zatcaStatus || "PENDING"}`, 10, y, { width: w });
-      y += 8;
-
-      // QR Code placeholder (base64 TLV data)
+      doc.text(`UUID:   ${zatcaData.zatcaUuid}`,                          10, y, { width: w }); y += 8;
+      if (zatcaData.icv)
+        { doc.text(`ICV:    ${zatcaData.icv}`,                            10, y, { width: w }); y += 8; }
+      if (zatcaData.invoiceHash)
+        { doc.text(`Hash:   ${zatcaData.invoiceHash.substring(0, 32)}…`,  10, y, { width: w }); y += 8; }
+      doc.text(`Status: ${zatcaData.zatcaStatus ?? "PENDING"}`,           10, y, { width: w }); y += 8;
       if (zatcaData.qrCode) {
-        doc.font("Helvetica").fontSize(6)
-          .text("QR: See digital copy", 10, y, { width: w, align: "center" });
-        y += 8;
+        useAr(false);
+        doc.fontSize(6).text(ar("امسح رمز QR للتحقق من الفاتورة"),        10, y, { width: w, align: "right" }); y += 8;
       }
     }
 
-    // ─── Footer ───
-    y += 8;
-    doc.moveTo(10, y).lineTo(w + 10, y).lineWidth(0.3).stroke();
-    y += 8;
-    doc.font("Helvetica").fontSize(7)
-      .text("شكراً لزيارتكم — Thank you for visiting", 10, y, { width: w, align: "center" });
-    y += 10;
-    doc.text("Powered by POS1 | ZATCA Compliant", 10, y, { width: w, align: "center" });
+    // ─── Footer ───────────────────────────────────────────────────────────────
+    y += 6;
+    doc.moveTo(10, y).lineTo(w + 10, y).lineWidth(0.3).stroke(); y += 8;
+    useAr(false);
+    doc.fontSize(7).text(ar("شكراً لزيارتكم — Thank you for visiting"),
+      10, y, { width: w, align: "center" }); y += 10;
+    doc.font("Helvetica").fontSize(6)
+       .text("Powered by AMPOS | ZATCA Compliant", 10, y, { width: w, align: "center" });
 
     doc.end();
   });

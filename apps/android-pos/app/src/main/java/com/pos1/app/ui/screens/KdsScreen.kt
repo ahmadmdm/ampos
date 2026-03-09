@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,10 +35,6 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -49,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,27 +59,27 @@ import com.pos1.app.ui.viewmodel.KdsViewModel
 import kotlinx.coroutines.delay
 
 /* ═══════════════════════════════════════════════════════════════
-   KDS Screen — Kitchen Display with Kanban columns
+   KDS Screen — Dark Premium Kitchen Display  (Ramotion style)
    ═══════════════════════════════════════════════════════════════ */
 
-private data class KdsColumn(
-    val status: String,
-    val labelAr: String,
-    val color: Color,
-    val bgColor: Color,
-)
+private val VoidBg      = Color(0xFFF4F6FF)
+private val Surface1    = Color(0xFFFFFFFF)
+private val Surface2    = Color(0xFFF8F9FF)
+private val Ghost       = Color(0x0D000000)
+private val GhostBorder = Color(0x12000000)
+
+private data class KdsColDef(val status: String, val labelAr: String, val color: Color)
 
 private val kdsColumns = listOf(
-    KdsColumn("NEW", "جديد", PosColors.Info, PosColors.InfoBg),
-    KdsColumn("COOKING", "قيد التحضير", PosColors.Warning, PosColors.WarningBg),
-    KdsColumn("READY", "جاهز", PosColors.Success, PosColors.SuccessBg),
-    KdsColumn("SERVED", "تم التقديم", PosColors.Slate500, PosColors.Slate100),
+    KdsColDef("NEW",     "جديد",         Color(0xFF3B82F6)),
+    KdsColDef("COOKING", "قيد التحضير",  Color(0xFFF59E0B)),
+    KdsColDef("READY",   "جاهز",          Color(0xFF10B981)),
+    KdsColDef("SERVED",  "تم التقديم",   Color(0xFF64748B)),
 )
 
 @Composable
 fun KdsScreen(vm: KdsViewModel) {
 
-    // Auto-refresh every 4 seconds
     LaunchedEffect(Unit) {
         while (true) {
             vm.refreshTickets()
@@ -91,14 +90,14 @@ fun KdsScreen(vm: KdsViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(VoidBg)
             .padding(top = 12.dp),
     ) {
         // ─── Header ───
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 20.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -107,66 +106,64 @@ fun KdsScreen(vm: KdsViewModel) {
                     "شاشة المطبخ",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
+                    color = PosColors.Slate900,
                 )
                 Text(
                     "${vm.tickets.size} تذكرة نشطة",
                     style = MaterialTheme.typography.bodySmall,
-                    color = PosColors.Slate500,
+                    color = Color(0xFF64748B),
                 )
             }
-
-            // SLA Warning count
             val slaBreaches = vm.tickets.count { it.elapsedMin > 12 }
             if (slaBreaches > 0) {
-                PulsingWarning(count = slaBreaches)
+                DarkSlaBadge(count = slaBreaches)
             }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        // ─── Station Filter (dynamic from API) ───
+        // ─── Station Filter ───
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp),
         ) {
             items(vm.stations) { station ->
                 val isSelected = station == vm.selectedStation
-                FilterChip(
-                    selected = isSelected,
+                Surface(
                     onClick = { vm.selectedStation = station },
-                    label = {
-                        Text(station, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.primary,
-                    ),
                     shape = RoundedCornerShape(20.dp),
-                )
+                    color = if (isSelected) Color(0xFF7C3AED) else Ghost,
+                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF7C3AED) else GhostBorder),
+                ) {
+                    Text(
+                        station,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
 
         // ─── Kanban Board ───
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            kdsColumns.forEach { column ->
-                val columnTickets = vm.filteredTickets(column.status)
-
-                KdsColumnView(
-                    column = column,
-                    tickets = columnTickets,
-                    onStatusChange = { ticketId, newStatus ->
-                        vm.updateTicketStatus(ticketId, newStatus)
-                    },
+            kdsColumns.forEach { col ->
+                val colTickets = vm.filteredTickets(col.status)
+                DarkKdsColumn(
+                    col = col,
+                    tickets = colTickets,
+                    onStatusChange = { id, next -> vm.updateTicketStatus(id, next) },
                     modifier = Modifier
-                        .width(280.dp)
+                        .width(288.dp)
                         .fillMaxHeight(),
                 )
             }
@@ -174,37 +171,33 @@ fun KdsScreen(vm: KdsViewModel) {
     }
 }
 
-/* ─── Pulsing SLA Warning ─── */
+/* ─── Pulsing SLA Badge ─── */
 
 @Composable
-private fun PulsingWarning(count: Int) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val alpha by infiniteTransition.animateFloat(
+private fun DarkSlaBadge(count: Int) {
+    val inf = rememberInfiniteTransition(label = "slaPulse")
+    val alpha by inf.animateFloat(
         initialValue = 1f,
-        targetValue = 0.4f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pulseAlpha",
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+        label = "slaAlpha",
     )
-
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = PosColors.DangerBg,
-        modifier = Modifier.alpha(alpha),
+    Box(
+        modifier = Modifier
+            .alpha(alpha)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF7F1D1D))
+            .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Outlined.AccessTime, null, modifier = Modifier.size(16.dp), tint = PosColors.Danger)
-            Spacer(Modifier.width(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.AccessTime, null, modifier = Modifier.size(15.dp), tint = Color(0xFFEF4444))
+            Spacer(Modifier.width(6.dp))
             Text(
                 "$count تجاوز SLA",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = PosColors.Danger,
+                color = Color(0xFFEF4444),
             )
         }
     }
@@ -213,85 +206,84 @@ private fun PulsingWarning(count: Int) {
 /* ─── KDS Column ─── */
 
 @Composable
-private fun KdsColumnView(
-    column: KdsColumn,
+private fun DarkKdsColumn(
+    col: KdsColDef,
     tickets: List<KdsTicketUi>,
     onStatusChange: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = column.bgColor.copy(alpha = 0.3f)),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(0.dp),
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Surface1)
+            .border(1.dp, col.color.copy(alpha = 0.18f), RoundedCornerShape(16.dp)),
     ) {
-        Column {
-            // Column header
+        // ── Column header strip ──
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(col.color.copy(alpha = 0.12f))
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(column.color.copy(alpha = 0.1f))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier
-                            .size(10.dp)
+                            .size(9.dp)
                             .clip(CircleShape)
-                            .background(column.color)
+                            .background(col.color)
+                            .shadow(4.dp, CircleShape, ambientColor = col.color, spotColor = col.color)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        column.labelAr,
+                        col.labelAr,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = column.color,
+                        color = col.color,
                     )
                 }
-                Surface(
-                    shape = CircleShape,
-                    color = column.color.copy(alpha = 0.15f),
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            "${tickets.size}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = column.color,
-                        )
-                    }
-                }
-            }
-
-            // Tickets
-            if (tickets.isEmpty()) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
-                    contentAlignment = Alignment.Center,
+                    Modifier
+                        .clip(CircleShape)
+                        .background(col.color.copy(alpha = 0.18f))
+                        .padding(horizontal = 9.dp, vertical = 3.dp),
                 ) {
                     Text(
-                        "لا توجد تذاكر",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = PosColors.Slate400,
+                        "${tickets.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = col.color,
                     )
                 }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(8.dp),
-                ) {
-                    items(tickets, key = { it.id }) { ticket ->
-                        KdsTicketCard(
-                            ticket = ticket,
-                            currentStatus = column.status,
-                            onStatusChange = onStatusChange,
-                        )
-                    }
+            }
+        }
+
+        // ── Tickets ──
+        if (tickets.isEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("لا توجد تذاكر", style = MaterialTheme.typography.bodySmall, color = Color(0xFF475569))
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(10.dp),
+            ) {
+                items(tickets, key = { it.id }) { ticket ->
+                    DarkKdsTicketCard(
+                        ticket = ticket,
+                        currentStatus = col.status,
+                        columnColor = col.color,
+                        onStatusChange = onStatusChange,
+                    )
                 }
             }
         }
@@ -301,134 +293,154 @@ private fun KdsColumnView(
 /* ─── KDS Ticket Card ─── */
 
 @Composable
-private fun KdsTicketCard(
+private fun DarkKdsTicketCard(
     ticket: KdsTicketUi,
     currentStatus: String,
+    columnColor: Color,
     onStatusChange: (String, String) -> Unit,
 ) {
     val isSlaBreached = ticket.elapsedMin > 12
-    val isWarning = ticket.elapsedMin > 8
+    val isWarning     = ticket.elapsedMin > 8
 
     val borderColor by animateColorAsState(
         when {
-            isSlaBreached -> PosColors.Danger
-            isWarning -> PosColors.Warning
-            else -> Color.Transparent
+            isSlaBreached -> Color(0xFFEF4444)
+            isWarning     -> Color(0xFFF59E0B)
+            else          -> Color.Transparent
         },
         label = "ticketBorder",
     )
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(12.dp),
-        border = if (isSlaBreached || isWarning) BorderStroke(2.dp, borderColor) else null,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface2)
+            .border(
+                width = 1.5.dp,
+                color = if (isSlaBreached || isWarning) borderColor else GhostBorder,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .padding(12.dp),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    ticket.orderNo,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (ticket.tableCode != "-") {
-                        Surface(shape = RoundedCornerShape(6.dp), color = PosColors.InfoBg) {
-                            Text(
-                                ticket.tableCode,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = PosColors.Info,
-                            )
-                        }
-                        Spacer(Modifier.width(6.dp))
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = when {
-                            isSlaBreached -> PosColors.DangerBg
-                            isWarning -> PosColors.WarningBg
-                            else -> PosColors.Slate100
-                        },
+        // Header row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                ticket.orderNo,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = PosColors.Slate900,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (ticket.tableCode != "-") {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFFEFF6FF))
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
                     ) {
+                        Text(
+                            ticket.tableCode,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF60A5FA),
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                }
+                // Timer badge
+                val timerBg = when {
+                    isSlaBreached -> Color(0xFF7F1D1D)
+                    isWarning     -> Color(0xFF451A03)
+                    else          -> Ghost
+                }
+                val timerColor = when {
+                    isSlaBreached -> Color(0xFFEF4444)
+                    isWarning     -> Color(0xFFF59E0B)
+                    else          -> Color(0xFF94A3B8)
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(timerBg)
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.AccessTime, null, Modifier.size(11.dp), tint = timerColor)
+                        Spacer(Modifier.width(3.dp))
                         Text(
                             "${ticket.elapsedMin}د",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = when {
-                                isSlaBreached -> PosColors.Danger
-                                isWarning -> PosColors.Warning
-                                else -> PosColors.Slate600
-                            },
+                            color = timerColor,
                         )
                     }
                 }
             }
+        }
 
+        if (ticket.items.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            // Thin accent divider
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(columnColor.copy(alpha = 0.15f))
+            )
             Spacer(Modifier.height(8.dp))
-
-            // Items (parsed from API)
-            if (ticket.items.isNotEmpty()) {
-                ticket.items.forEach { item ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
+            ticket.items.forEach { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        "• ${item.qty}× ${item.name}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFCBD5E1),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (item.station.isNotBlank()) {
                         Text(
-                            "• ${item.qty}× ${item.name}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PosColors.Slate600,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
+                            item.station,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF475569),
                         )
-                        if (item.station.isNotBlank()) {
-                            Text(
-                                item.station,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = PosColors.Slate400,
-                            )
-                        }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
             }
+        }
 
-            // Action buttons
-            val nextStatuses = when (currentStatus) {
-                "NEW" -> listOf("COOKING" to "بدء التحضير")
-                "COOKING" -> listOf("READY" to "جاهز")
-                "READY" -> listOf("SERVED" to "تم التقديم")
-                else -> emptyList()
-            }
-
-            if (nextStatuses.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Action button
+        val nextStatuses = when (currentStatus) {
+            "NEW"     -> listOf("COOKING" to "بدء التحضير")
+            "COOKING" -> listOf("READY"   to "جاهز")
+            "READY"   -> listOf("SERVED"  to "تم التقديم")
+            else      -> emptyList()
+        }
+        if (nextStatuses.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            nextStatuses.forEach { (nextStatus, label) ->
+                val btnColor = kdsColumns.firstOrNull { it.status == nextStatus }?.color ?: columnColor
+                Button(
+                    onClick = { onStatusChange(ticket.id, nextStatus) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(36.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = btnColor.copy(alpha = 0.85f)),
                 ) {
-                    nextStatuses.forEach { (status, label) ->
-                        val statusColumn = kdsColumns.firstOrNull { it.status == status }
-                        Button(
-                            onClick = { onStatusChange(ticket.id, status) },
-                            modifier = Modifier.weight(1f).height(36.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = statusColumn?.color ?: MaterialTheme.colorScheme.primary,
-                            ),
-                        ) {
-                            Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.width(4.dp))
-                            Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(16.dp))
-                        }
-                    }
+                    Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.ChevronRight, null, Modifier.size(15.dp), tint = Color.White)
                 }
             }
         }

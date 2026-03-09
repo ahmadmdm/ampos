@@ -1,363 +1,334 @@
 import SwiftUI
 
+// MARK: ─ KDS Screen (Ramotion Dark Premium Kanban)
+
 struct KdsScreen: View {
     @StateObject private var viewModel: KdsViewModel
     @State private var refreshTimer: Timer?
-    
+
     init(apiClient: ApiClient) {
         _viewModel = StateObject(wrappedValue: KdsViewModel(apiClient: apiClient))
     }
-    
-    let kdsColumns = [
-        KdsColumn(status: "NEW", labelAr: "جديد", color: PosColors.Info, bgColor: PosColors.InfoBg),
-        KdsColumn(status: "COOKING", labelAr: "قيد التحضير", color: PosColors.Warning, bgColor: PosColors.WarningBg),
-        KdsColumn(status: "READY", labelAr: "جاهز", color: PosColors.Success, bgColor: PosColors.SuccessBg),
-        KdsColumn(status: "SERVED", labelAr: "تم التقديم", color: PosColors.Slate500, bgColor: PosColors.Slate100)
+
+    fileprivate struct KdsColDef {
+        let status: String
+        let label: String
+        let color: Color
+    }
+
+    private let columns: [KdsColDef] = [
+        KdsColDef(status: "NEW",     label: "جديد",          color: Color(hex: "3B82F6")),
+        KdsColDef(status: "COOKING", label: "قيد التحضير",   color: Color(hex: "F59E0B")),
+        KdsColDef(status: "READY",   label: "جاهز",          color: Color(hex: "10B981")),
+        KdsColDef(status: "SERVED",  label: "تم التقديم",    color: Color(hex: "64748B")),
     ]
-    
-    var slaBreaches: Int {
+
+    private var slaBreaches: Int {
         viewModel.tickets.filter { $0.elapsedMin > 12 }.count
     }
-    
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("شاشة المطبخ")
-                        .font(.title2)  
-                        .fontWeight(.bold)
-                    Text("\(viewModel.tickets.count) تذكرة نشطة")
-                        .font(.caption)
-                        .foregroundColor(PosColors.Slate500)
-                }
-                
-                Spacer()
-                
-                // SLA Warning
-                if slaBreaches > 0 {
-                    PulsingWarningView(count: slaBreaches)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            
-            // Station Filter
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(viewModel.stations, id: \.self) { station in
-                        Button(action: {
-                            viewModel.selectedStation = station
-                        }) {
-                            Text(station)
-                                .font(.caption)
-                                .fontWeight(viewModel.selectedStation == station ? .bold : .regular)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    viewModel.selectedStation == station 
-                                        ? PosColors.Brand100 
-                                        : PosColors.Slate100
-                                )
-                                .foregroundColor(
-                                    viewModel.selectedStation == station 
-                                        ? PosColors.Brand700 
-                                        : PosColors.Slate600
-                                )
-                                .cornerRadius(20)
+        ZStack {
+            Color(hex: "F4F6FF").ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // ── Header ──────────────────────────────────────────
+                HStack(spacing: 12) {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("شاشة المطبخ")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(Color(hex: "0F172A"))
+                        Text("\(viewModel.tickets.count) تذكرة نشطة")
+                            .font(.caption)
+                            .foregroundColor(Color(hex: "94A3B8"))
+                    }
+
+                    Spacer()
+
+                    // SLA breach badge
+                    if slaBreaches > 0 {
+                        SlaPulseBadge(count: slaBreaches)
+                    }
+
+                    // Station filter
+                    if viewModel.stations.count > 1 {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(viewModel.stations, id: \.self) { station in
+                                    Button {
+                                        viewModel.selectedStation = station
+                                    } label: {
+                                        let sel = viewModel.selectedStation == station
+                                        Text(station)
+                                            .font(.system(size: 12, weight: sel ? .bold : .medium))
+                                            .foregroundColor(sel ? PosColors.Violet600 : Color(hex: "64748B"))
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(sel ? PosColors.Violet600.opacity(0.12) : Color.black.opacity(0.04))
+                                            .cornerRadius(16)
+                                            .overlay(
+                                                Capsule().stroke(sel ? PosColors.Violet600.opacity(0.4) : Color.clear, lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-            }
-            .padding(.top, 12)
-            
-            // Kanban Board 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(kdsColumns, id: \.status) { column in
-                        let columnTickets = viewModel.filteredTickets(status: column.status)
-                        
-                        KdsColumnView(
-                            column: column,
-                            tickets: columnTickets,
-                            onStatusChange: { ticketId, newStatus in
-                                Task {
-                                    await viewModel.updateTicketStatus(ticketId: ticketId, status: newStatus)
-                                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+
+                // ── Kanban board ────────────────────────────────────
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ForEach(columns, id: \.status) { col in
+                            let colTickets = viewModel.filteredTickets(status: col.status)
+                            KdsDarkColumn(
+                                col: col,
+                                tickets: colTickets
+                            ) { ticketId, newStatus in
+                                Task { await viewModel.updateTicketStatus(ticketId: ticketId, status: newStatus) }
                             }
-                        )
-                        .frame(width: 280)
+                            .frame(width: 290)
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
-                .padding(.horizontal, 8)
+                .frame(maxHeight: .infinity)
             }
-            .frame(maxHeight: .infinity)
-            .padding(.top, 12)
         }
-        .navigationBarHidden(true)
-        .onAppear {
-            startAutoRefresh()
-        }
-        .onDisappear {
-            stopAutoRefresh()
-        }
-        .task {
-            await viewModel.refreshTickets()
-        }
+        .onAppear { startAutoRefresh() }
+        .onDisappear { stopAutoRefresh() }
+        .task { await viewModel.refreshTickets() }
     }
-    
+
     private func startAutoRefresh() {
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
-            Task {
-                await viewModel.refreshTickets()
-            }
+            Task { await viewModel.refreshTickets() }
         }
     }
-    
     private func stopAutoRefresh() {
         refreshTimer?.invalidate()
         refreshTimer = nil
     }
 }
 
-// MARK: - KdsColumn Data Structure
-struct KdsColumn {
-    let status: String
-    let labelAr: String
-    let color: Color
-    let bgColor: Color
-}
+// MARK: ─ SLA Pulse Badge
 
-// MARK: - Pulsing SLA Warning
-struct PulsingWarningView: View {
+private struct SlaPulseBadge: View {
     let count: Int
-    @State private var pulseAnimation = false
-    
+    @State private var pulse = false
+
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "clock")
-                .font(.system(size: 16))
-                .foregroundColor(PosColors.Danger)
-            
+        HStack(spacing: 6) {
+            Circle()
+                .fill(Color(hex: "EF4444"))
+                .frame(width: 8, height: 8)
+                .scaleEffect(pulse ? 1.4 : 1)
+                .opacity(pulse ? 0.5 : 1)
+                .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulse)
+
             Text("\(count) تجاوز SLA")
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundColor(PosColors.Danger)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(Color(hex: "EF4444"))
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(PosColors.DangerBg)
-        .cornerRadius(10)
-        .opacity(pulseAnimation ? 0.4 : 1.0)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                pulseAnimation = true
-            }
-        }
+        .padding(.vertical, 7)
+        .background(Color(hex: "EF4444").opacity(0.1))
+        .cornerRadius(20)
+        .overlay(Capsule().stroke(Color(hex: "EF4444").opacity(0.25), lineWidth: 1))
+        .onAppear { pulse = true }
     }
 }
 
-// MARK: - KDS Column View
-struct KdsColumnView: View {
-    let column: KdsColumn
+// MARK: ─ KDS Column
+
+private struct KdsDarkColumn: View {
+    let col: KdsScreen.KdsColDef
     let tickets: [KdsTicketUi]
     let onStatusChange: (String, String) -> Void
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            // Column Header
+            // Column header
             HStack {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(column.color)
-                        .frame(width: 10, height: 10)
-                    
-                    Text(column.labelAr)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(column.color)
+                HStack(spacing: 7) {
+                    Circle().fill(col.color).frame(width: 9, height: 9)
+                    Text(col.label)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(col.color)
                 }
-                
                 Spacer()
-                
                 Text("\(tickets.count)")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(column.color)
-                    .frame(width: 28, height: 28)
-                    .background(column.color.opacity(0.15))
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(col.color)
+                    .frame(width: 26, height: 26)
+                    .background(col.color.opacity(0.14))
                     .clipShape(Circle())
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(column.color.opacity(0.1))
-            
+            .padding(.vertical, 12)
+            .background(col.color.opacity(0.07))
+
             // Tickets
             if tickets.isEmpty {
                 VStack {
                     Spacer()
-                    Text("لا توجد تذاكر")
-                        .font(.caption)
-                        .foregroundColor(PosColors.Slate400)
+                    VStack(spacing: 8) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 28))
+                            .foregroundColor(Color(hex: "E2E8F0"))
+                        Text("لا توجد تذاكر")
+                            .font(.caption)
+                            .foregroundColor(Color(hex: "94A3B8"))
+                    }
                     Spacer()
                 }
-                .frame(height: 120)
+                .frame(height: 140)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 10) {
                         ForEach(tickets) { ticket in
-                            KdsTicketCard(
+                            KdsDarkTicketCard(
                                 ticket: ticket,
-                                currentStatus: column.status,
+                                currentStatus: col.status,
+                                accentColor: col.color,
                                 onStatusChange: onStatusChange
                             )
                         }
                     }
-                    .padding(8)
+                    .padding(10)
                 }
             }
         }
-        .background(column.bgColor.opacity(0.3))
-        .cornerRadius(16)
+        .background(Color(hex: "FFFFFF"))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(col.color.opacity(0.12), lineWidth: 1)
+        )
         .frame(maxHeight: .infinity)
     }
 }
 
-// MARK: - KDS Ticket Card
-struct KdsTicketCard: View {
+// MARK: ─ KDS Ticket Card
+
+private struct KdsDarkTicketCard: View {
     let ticket: KdsTicketUi
     let currentStatus: String
+    let accentColor: Color
     let onStatusChange: (String, String) -> Void
-    
-    var isSlaBreached: Bool { ticket.elapsedMin > 12 }
-    var isWarning: Bool { ticket.elapsedMin > 8 }
-    
-    var borderColor: Color {
-        if isSlaBreached { return PosColors.Danger }
-        if isWarning { return PosColors.Warning }
-        return Color.clear
+
+    private var isSla: Bool { ticket.elapsedMin > 12 }
+    private var isWarn: Bool { ticket.elapsedMin > 8 }
+
+    private var timerColor: Color {
+        isSla ? Color(hex: "DC2626") : isWarn ? Color(hex: "D97706") : Color(hex: "94A3B8")
     }
-    
-    var nextStatuses: [(status: String, label: String)] {
+
+    private var nextAction: (status: String, label: String)? {
         switch currentStatus {
-        case "NEW":
-            return [("COOKING", "بدء التحضير")]
-        case "COOKING":
-            return [("READY", "جاهز")]
-        case "READY":
-            return [("SERVED", "تم التقديم")]
-        default:
-            return []
+        case "NEW":     return ("COOKING", "ابدأ التحضير")
+        case "COOKING": return ("READY",   "اجعله جاهزاً")
+        case "READY":   return ("SERVED",  "تم التقديم")
+        default:        return nil
         }
     }
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header
+        VStack(alignment: .trailing, spacing: 10) {
+            // Top row
             HStack {
-                Text(ticket.orderNo)
-                    .font(.system(size: 14, weight: .bold))
-                
-                Spacer()
-                
-                HStack(spacing: 6) {
-                    if ticket.tableCode != "-" {
-                        Text(ticket.tableCode)
-                            .font(.caption)
-                            .foregroundColor(PosColors.Info)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(PosColors.InfoBg)
-                            .cornerRadius(6)
-                    }
-                    
-                    Text("\(ticket.elapsedMin)د")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(
-                            isSlaBreached ? PosColors.Danger :
-                            isWarning ? PosColors.Warning :
-                            PosColors.Slate600
-                        )
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            isSlaBreached ? PosColors.DangerBg :
-                            isWarning ? PosColors.WarningBg :
-                            PosColors.Slate100
-                        )
+                // Table badge
+                if ticket.tableCode != "-" {
+                    Text(ticket.tableCode)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color(hex: "3B82F6"))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(hex: "3B82F6").opacity(0.12))
                         .cornerRadius(6)
                 }
+
+                Spacer()
+
+                Text("#\(ticket.orderNo)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color(hex: "0F172A"))
+
+                // Timer
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 10))
+                    Text("\(ticket.elapsedMin)د")
+                        .font(.system(size: 11, weight: .bold))
+                        .monospacedDigit()
+                }
+                .foregroundColor(timerColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(timerColor.opacity(0.12))
+                .cornerRadius(6)
             }
-            
-            // Items
+
+            // Items list
             if !ticket.items.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .trailing, spacing: 5) {
                     ForEach(ticket.items) { item in
-                        HStack {
-                            Text("• \(item.qty)× \(item.name)")
-                                .font(.caption)
-                                .foregroundColor(PosColors.Slate600)
-                                .lineLimit(1)
-                            
+                        HStack(spacing: 6) {
                             Spacer()
-                            
-                            if !item.station.isEmpty {
-                                Text(item.station)
-                                    .font(.caption)
-                                    .foregroundColor(PosColors.Slate400)
-                            }
+                            Text(item.name)
+                                .font(.system(size: 12))
+                                .foregroundColor(Color(hex: "475569"))
+                            Text("×\(item.qty)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(accentColor)
+                                .frame(minWidth: 24)
                         }
                     }
                 }
+                .padding(10)
+                .background(Color.black.opacity(0.03))
+                .cornerRadius(10)
             }
-            
-            // Action Buttons
-            if !nextStatuses.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(nextStatuses, id: \.status) { statusInfo in
-                        let statusColumn = kdsColumns.first { $0.status == statusInfo.status }
-                        
-                        Button(action: {
-                            onStatusChange(ticket.id, statusInfo.status)
-                        }) {
-                            HStack(spacing: 4) {
-                                Text(statusInfo.label)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 36)
-                            .background(statusColumn?.color ?? PosColors.Brand600)
-                            .cornerRadius(8)
-                        }
+
+            // Action button
+            if let action = nextAction {
+                Button {
+                    onStatusChange(ticket.id, action.status)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(action.label)
+                            .font(.system(size: 12, weight: .bold))
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11, weight: .bold))
                     }
+                    .foregroundColor(accentColor)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(accentColor.opacity(0.12))
+                    .cornerRadius(9)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9)
+                            .stroke(accentColor.opacity(0.25), lineWidth: 1)
+                    )
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(12)
-        .background(Color.white)
-        .cornerRadius(12)
+        .background(Color(hex: "F8F9FF"))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(borderColor, lineWidth: (isSlaBreached || isWarning) ? 2 : 0)
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    isSla ? Color(hex: "EF4444").opacity(0.3) :
+                    isWarn ? Color(hex: "F59E0B").opacity(0.2) :
+                    Color.black.opacity(0.07),
+                    lineWidth: 1
+                )
         )
-        .shadow(color: PosColors.Slate200, radius: 2, x: 0, y: 1)
     }
-}
-
-// Define kdsColumns as static property for use in KdsTicketCard
-private let kdsColumns = [
-    KdsColumn(status: "NEW", labelAr: "جديد", color: PosColors.Info, bgColor: PosColors.InfoBg),
-    KdsColumn(status: "COOKING", labelAr: "قيد التحضير", color: PosColors.Warning, bgColor: PosColors.WarningBg),
-    KdsColumn(status: "READY", labelAr: "جاهز", color: PosColors.Success, bgColor: PosColors.SuccessBg),
-    KdsColumn(status: "SERVED", labelAr: "تم التقديم", color: PosColors.Slate500, bgColor: PosColors.Slate100)
-]
-
-#Preview {
-    KdsScreen(apiClient: ApiClient(configStore: PosConfigStore()))
 }

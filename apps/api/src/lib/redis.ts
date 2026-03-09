@@ -13,6 +13,9 @@ export const redis = redisUrl
       async set(_k: string, _v: string, _mode?: string, _seconds?: number) {
         return "OK";
       },
+      async del(..._keys: string[]) {
+        return 0;
+      },
       async publish(_channel: string, _payload: string) {
         return 0;
       }
