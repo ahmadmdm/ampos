@@ -4,14 +4,12 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useAlertSound } from "@pos1/ui";
 
-const API = "http://localhost:3001";
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4001";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "https://api.clo0.net";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? API;
 const BRANCH_ID = "br_demo";
-const DEV_AUTH_HEADERS = {
-  "x-roles": "WAITER_RUNNER",
-  "x-org-id": "org_demo",
-  "x-branch-id": BRANCH_ID,
-  "x-user-id": "waiter_demo"
+const DEMO_LOGIN = {
+  email: "waiter@demo.local",
+  password: "demo123"
 };
 
 type Call = { id: string; table: { code: string }; reason: string; note?: string; status: "CREATED" | "ACKNOWLEDGED" | "RESOLVED"; createdAt: string };
@@ -21,12 +19,54 @@ export default function WaiterPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [ready, setReady] = useState<ReadyTicket[]>([]);
   const [statusText, setStatusText] = useState("جاهز");
+  const [accessToken, setAccessToken] = useState("");
   const playAlert = useAlertSound();
 
+  function getAuthHeaders() {
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers.authorization = `Bearer ${accessToken}`;
+    }
+    return headers;
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function login() {
+      try {
+        const res = await fetch(`${API}/api/auth/login`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(DEMO_LOGIN)
+        }).then((r) => r.json());
+
+        if (!cancelled) {
+          if (res.ok && res.data?.accessToken) {
+            setAccessToken(res.data.accessToken);
+          } else {
+            setStatusText(`فشل تسجيل الدخول: ${res.error ?? "UNKNOWN"}`);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStatusText(`فشل تسجيل الدخول: ${(error as Error).message}`);
+        }
+      }
+    }
+
+    login();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function fetchAll() {
+    if (!accessToken) return;
     const [callsRes, readyRes] = await Promise.all([
-      fetch(`${API}/api/waiter/calls?branchId=${BRANCH_ID}`, { headers: DEV_AUTH_HEADERS }).then((r) => r.json()),
-      fetch(`${API}/api/waiter/ready-queue?branchId=${BRANCH_ID}`, { headers: DEV_AUTH_HEADERS }).then((r) => r.json())
+      fetch(`${API}/api/waiter/calls?branchId=${BRANCH_ID}`, { headers: getAuthHeaders() }).then((r) => r.json()),
+      fetch(`${API}/api/waiter/ready-queue?branchId=${BRANCH_ID}`, { headers: getAuthHeaders() }).then((r) => r.json())
     ]);
 
     setCalls(callsRes.data ?? []);
@@ -39,13 +79,19 @@ export default function WaiterPage() {
   }
 
   useEffect(() => {
+    if (!accessToken) return;
     fetchAll();
     const t = setInterval(fetchAll, 3000);
     return () => clearInterval(t);
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
-    const socket = io(SOCKET_URL, { transports: ["websocket"] });
+    if (!accessToken) return;
+
+    const socket = io(SOCKET_URL, {
+      transports: ["websocket"],
+      auth: { token: accessToken }
+    });
     socket.emit("join-waiter", BRANCH_ID);
     const refresh = () => fetchAll();
     socket.on("WAITER_CALL_CREATED", () => { playAlert(1000, 0.3, 3); refresh(); });
@@ -59,12 +105,12 @@ export default function WaiterPage() {
       socket.off("KITCHEN_TICKET_UPDATED", refresh);
       socket.disconnect();
     };
-  }, []);
+  }, [accessToken]);
 
   async function ack(id: string) {
     const res = await fetch(`${API}/api/waiter/calls/${id}/ack`, {
       method: "PATCH",
-      headers: { "content-type": "application/json", ...DEV_AUTH_HEADERS },
+      headers: { "content-type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ actorUserId: "waiter_demo" })
     }).then((r) => r.json());
     setStatusText(res.ok ? "تم استلام النداء" : `فشل الاستلام: ${res.error ?? "UNKNOWN"}`);
@@ -74,7 +120,7 @@ export default function WaiterPage() {
   async function resolve(id: string) {
     const res = await fetch(`${API}/api/waiter/calls/${id}/resolve`, {
       method: "PATCH",
-      headers: { "content-type": "application/json", ...DEV_AUTH_HEADERS },
+      headers: { "content-type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ actorUserId: "waiter_demo" })
     }).then((r) => r.json());
     setStatusText(res.ok ? "تم حل النداء" : `فشل الحل: ${res.error ?? "UNKNOWN"}`);

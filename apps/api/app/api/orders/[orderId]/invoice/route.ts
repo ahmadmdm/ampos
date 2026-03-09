@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { NextRequest } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { fail } from "@/src/lib/http";
@@ -9,6 +11,34 @@ import PDFDocument from "pdfkit";
 import { generateZatcaInvoice, retryZatcaSubmission, ZatcaStatus } from "@/src/zatca";
 import { decodeQrTlv } from "@/src/zatca/qr-tlv";
 
+function ensurePdfKitDataFiles() {
+  const targetDir = path.join(
+    process.cwd(),
+    ".next/server/app/api/orders/[orderId]/invoice/data"
+  );
+
+  const requiredFile = path.join(targetDir, "Helvetica.afm");
+  if (fs.existsSync(requiredFile)) {
+    return;
+  }
+
+  const sourceCandidates = [
+    path.join(process.cwd(), "node_modules/pdfkit/js/data"),
+    path.join(process.cwd(), "../../node_modules/pdfkit/js/data"),
+  ];
+  const sourceDir = sourceCandidates.find((candidate) => fs.existsSync(candidate));
+
+  if (!sourceDir) {
+    throw new Error("PDFKIT_DATA_DIR_NOT_FOUND");
+  }
+
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  for (const entry of fs.readdirSync(sourceDir)) {
+    fs.copyFileSync(path.join(sourceDir, entry), path.join(targetDir, entry));
+  }
+}
+
 /** Generate a professional Arabic-ready PDF invoice for an order */
 function buildInvoicePdf(order: any, branch: any, zatcaData?: {
   qrCode?: string;
@@ -18,6 +48,8 @@ function buildInvoicePdf(order: any, branch: any, zatcaData?: {
   icv?: number;
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    ensurePdfKitDataFiles();
+
     const doc = new PDFDocument({
       size: [226.77, 600], // ~80mm thermal receipt width
       margin: 10,

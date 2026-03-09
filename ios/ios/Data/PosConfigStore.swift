@@ -42,17 +42,24 @@ class PosConfigStore: ObservableObject {
         didSet { UserDefaults.standard.set(kitchenPrintCopies, forKey: "kitchenPrintCopies") }
     }
 
-    private static let localDevApiBaseUrl = "http://localhost:3002"
+    private static let defaultApiBaseUrl = "https://api.clo0.net"
 
     private static func normalizedApiBaseUrl(from rawValue: String?) -> String {
         let trimmed = (rawValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercased = trimmed.lowercased()
 
         if trimmed.isEmpty {
-            return localDevApiBaseUrl
+            return defaultApiBaseUrl
         }
 
         if trimmed.contains("api.ampos.com") {
-            return localDevApiBaseUrl
+            return defaultApiBaseUrl
+        }
+
+        if lowercased.contains("localhost") ||
+            lowercased.contains("127.0.0.1") ||
+            lowercased.contains("0.0.0.0") {
+            return defaultApiBaseUrl
         }
 
         if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {

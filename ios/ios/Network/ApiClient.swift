@@ -47,7 +47,7 @@ class ApiClient: ObservableObject {
         var raw = baseURL().trimmingCharacters(in: .whitespacesAndNewlines)
 
         if raw.isEmpty {
-            raw = "http://localhost:3002"
+            raw = "https://api.clo0.net"
         }
 
         if !(raw.hasPrefix("http://") || raw.hasPrefix("https://")) {
@@ -500,7 +500,7 @@ class ApiClient: ObservableObject {
             throw APIError.invalidURL
         }
 
-        return try? await performData(request)
+        return try await performData(request)
     }
     
     // MARK: - Coupons

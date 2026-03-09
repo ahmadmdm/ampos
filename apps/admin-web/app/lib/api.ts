@@ -1,6 +1,6 @@
 import { getStoredToken } from "./auth-context";
 
-export const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+export const API = process.env.NEXT_PUBLIC_API_URL || "https://api.clo0.net";
 
 function getAuthHeaders(): Record<string, string> {
   const token = getStoredToken();

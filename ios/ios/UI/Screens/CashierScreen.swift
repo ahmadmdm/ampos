@@ -1,4 +1,5 @@
 import SwiftUI
+import PDFKit
 
 private struct ShareableDocument: Identifiable {
     let id = UUID()
@@ -411,7 +412,56 @@ struct CashierScreen: View {
                 }
             )
         ) { document in
-            ShareSheet(items: [document.url])
+            PDFPreviewSheet(documentURL: document.url) {
+                viewModel.clearInvoicePreview()
+            }
+        }
+    }
+}
+
+private struct PDFPreviewSheet: View {
+    let documentURL: URL
+    let onClose: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            PDFDocumentView(documentURL: documentURL)
+                .background(Color.white)
+                .navigationTitle("معاينة الإيصال")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("إغلاق") {
+                            onClose()
+                        }
+                    }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ShareLink(item: documentURL) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                }
+        }
+    }
+}
+
+private struct PDFDocumentView: UIViewRepresentable {
+    let documentURL: URL
+
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.autoScales = true
+        view.displayMode = .singlePageContinuous
+        view.displayDirection = .vertical
+        view.backgroundColor = .white
+        view.document = PDFDocument(url: documentURL)
+        return view
+    }
+
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        if uiView.document?.documentURL != documentURL {
+            uiView.document = PDFDocument(url: documentURL)
         }
     }
 }

@@ -1,10 +1,11 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { io } from "socket.io-client";
 
-const API = "http://localhost:3001";
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4001";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "https://api.clo0.net";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? API;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://customer.clo0.net";
 const BRANCH_ID = "br_demo";
 const TABLE_ID = "tbl_demo_12";
 
@@ -36,6 +37,36 @@ export default function CustomerMenuPage() {
   const [showCart, setShowCart] = useState(false);
   const [showWaiter, setShowWaiter] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
+  const csrfTokenRef = useRef("");
+
+  async function ensureCsrfToken() {
+    if (csrfTokenRef.current) return csrfTokenRef.current;
+
+    const res = await fetch(`${API}/api/auth/csrf`, {
+      credentials: "include"
+    }).then((r) => r.json());
+
+    const token = res.data?.csrfToken ?? "";
+    if (!token) {
+      throw new Error(res.error ?? "CSRF_TOKEN_MISSING");
+    }
+
+    csrfTokenRef.current = token;
+    return token;
+  }
+
+  async function postWithCsrf(path: string, body: unknown) {
+    const csrfToken = await ensureCsrfToken();
+    return fetch(`${API}${path}`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken,
+      },
+      body: JSON.stringify(body),
+    });
+  }
 
   const total = useMemo(() => cart.reduce((sum, i) => sum + i.basePrice * i.qty, 0), [cart]);
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
@@ -48,10 +79,9 @@ export default function CustomerMenuPage() {
   async function loadTokenAndMenu() {
     setLoadingMenu(true);
     try {
-      const tokenRes = await fetch(`${API}/api/customer/table-token`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ branchId: BRANCH_ID, tableId: TABLE_ID }),
+      const tokenRes = await postWithCsrf("/api/customer/table-token", {
+        branchId: BRANCH_ID,
+        tableId: TABLE_ID,
       }).then((r) => r.json());
       const token = tokenRes.data?.token ?? "";
       setTableToken(token);
@@ -102,8 +132,12 @@ export default function CustomerMenuPage() {
   }, [trackingOrderId, tableToken]);
 
   useEffect(() => {
-    const socket = io(SOCKET_URL, { transports: ["websocket"] });
-    socket.emit("join-branch", BRANCH_ID);
+    if (!tableToken) return;
+
+    const socket = io(SOCKET_URL, {
+      transports: ["websocket"],
+      auth: { tableToken, branchId: BRANCH_ID }
+    });
     if (trackingOrderId) socket.emit("join-order", trackingOrderId);
     const onOrderStatus = (evt: { payload?: { orderId?: string; status?: string } }) => {
       if (evt?.payload?.orderId === trackingOrderId && evt.payload.status) {
@@ -115,7 +149,7 @@ export default function CustomerMenuPage() {
       socket.off("ORDER_STATUS_CHANGED", onOrderStatus);
       socket.disconnect();
     };
-  }, [trackingOrderId]);
+  }, [tableToken, trackingOrderId]);
 
   const add = useCallback((item: MenuItem) => {
     setCart((prev) => {
@@ -134,23 +168,19 @@ export default function CustomerMenuPage() {
   async function payNow() {
     if (!cart.length) return;
     setStatusMessage("جار إنشاء جلسة الدفع...");
-    const response = await fetch(`${API}/api/customer/checkout/session`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        branchId: BRANCH_ID,
-        tableId: TABLE_ID,
-        token: tableToken,
-        provider: "moyasar",
-        returnUrl: "http://localhost:3003",
-        type: "DINE_IN",
-        cart: cart.map((item) => ({
-          productId: item.id,
-          itemNameAr: item.nameAr,
-          qty: item.qty,
-          unitPrice: item.basePrice,
-        })),
-      }),
+    const response = await postWithCsrf("/api/customer/checkout/session", {
+      branchId: BRANCH_ID,
+      tableId: TABLE_ID,
+      token: tableToken,
+      provider: "moyasar",
+      returnUrl: APP_URL,
+      type: "DINE_IN",
+      cart: cart.map((item) => ({
+        productId: item.id,
+        itemNameAr: item.nameAr,
+        qty: item.qty,
+        unitPrice: item.basePrice,
+      })),
     });
     const payload = await response.json();
     const url = payload.data?.checkoutUrl ?? "";
@@ -159,31 +189,23 @@ export default function CustomerMenuPage() {
   }
 
   async function callWaiter() {
-    const res = await fetch(`${API}/api/customer/waiter-calls`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        branchId: BRANCH_ID,
-        tableId: TABLE_ID,
-        reason: waiterReason,
-        note,
-        token: tableToken,
-      }),
+    const res = await postWithCsrf("/api/customer/waiter-calls", {
+      branchId: BRANCH_ID,
+      tableId: TABLE_ID,
+      reason: waiterReason,
+      note,
+      token: tableToken,
     }).then((r) => r.json());
     setStatusMessage(res.ok ? "تم إرسال نداء النادل" : `فشل نداء النادل: ${res.error ?? "UNKNOWN"}`);
     if (res.ok) setShowWaiter(false);
   }
 
   async function requestBill() {
-    const res = await fetch(`${API}/api/customer/request-bill`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        branchId: BRANCH_ID,
-        tableId: TABLE_ID,
-        note: "يرجى إحضار الحساب",
-        token: tableToken,
-      }),
+    const res = await postWithCsrf("/api/customer/request-bill", {
+      branchId: BRANCH_ID,
+      tableId: TABLE_ID,
+      note: "يرجى إحضار الحساب",
+      token: tableToken,
     }).then((r) => r.json());
     setStatusMessage(res.ok ? "تم طلب الحساب" : `فشل طلب الحساب: ${res.error ?? "UNKNOWN"}`);
   }

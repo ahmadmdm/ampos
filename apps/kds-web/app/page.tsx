@@ -4,14 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { useAlertSound } from "@pos1/ui";
 
-const API = "http://localhost:3001";
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4001";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "https://api.clo0.net";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? API;
 const BRANCH_ID = "br_demo";
-const DEV_AUTH_HEADERS = {
-  "x-roles": "KITCHEN",
-  "x-org-id": "org_demo",
-  "x-branch-id": BRANCH_ID,
-  "x-user-id": "kitchen_demo"
+const DEMO_LOGIN = {
+  email: "kitchen@demo.local",
+  password: "demo123"
 };
 
 type Ticket = {
@@ -34,24 +32,72 @@ export default function KdsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [stationFilter, setStationFilter] = useState("ALL");
   const [statusText, setStatusText] = useState("جاهز");
+  const [accessToken, setAccessToken] = useState("");
   const playAlert = useAlertSound();
   const prevCountRef = useRef(0);
 
+  function getAuthHeaders() {
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers.authorization = `Bearer ${accessToken}`;
+    }
+    return headers;
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function login() {
+      try {
+        const res = await fetch(`${API}/api/auth/login`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(DEMO_LOGIN)
+        }).then((r) => r.json());
+
+        if (!cancelled) {
+          if (res.ok && res.data?.accessToken) {
+            setAccessToken(res.data.accessToken);
+          } else {
+            setStatusText(`فشل تسجيل الدخول: ${res.error ?? "UNKNOWN"}`);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStatusText(`فشل تسجيل الدخول: ${(error as Error).message}`);
+        }
+      }
+    }
+
+    login();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function fetchTickets() {
+    if (!accessToken) return;
     const query = stationFilter === "ALL" ? "" : `&station=${stationFilter}`;
-    const res = await fetch(`${API}/api/kds/tickets?branchId=${BRANCH_ID}${query}`, { headers: DEV_AUTH_HEADERS }).then((r) => r.json());
+    const res = await fetch(`${API}/api/kds/tickets?branchId=${BRANCH_ID}${query}`, { headers: getAuthHeaders() }).then((r) => r.json());
     setTickets(res.data ?? []);
     setStatusText(res.ok ? `تم تحديث ${res.data?.length ?? 0} تذكرة` : `فشل الجلب: ${res.error ?? "UNKNOWN"}`);
   }
 
   useEffect(() => {
+    if (!accessToken) return;
     fetchTickets();
     const t = setInterval(fetchTickets, 4000);
     return () => clearInterval(t);
-  }, [stationFilter]);
+  }, [accessToken, stationFilter]);
 
   useEffect(() => {
-    const socket = io(SOCKET_URL, { transports: ["websocket"] });
+    if (!accessToken) return;
+
+    const socket = io(SOCKET_URL, {
+      transports: ["websocket"],
+      auth: { token: accessToken }
+    });
     socket.emit("join-kds", BRANCH_ID);
     const refresh = () => fetchTickets();
     socket.on("KITCHEN_TICKET_CREATED", () => { playAlert(880, 0.2, 3); refresh(); });
@@ -63,7 +109,7 @@ export default function KdsPage() {
       socket.off("ORDER_CREATED", refresh);
       socket.disconnect();
     };
-  }, [stationFilter]);
+  }, [accessToken, stationFilter]);
 
   const byStatus = useMemo(
     () => columns.map((status) => ({ status, list: tickets.filter((t) => t.status === status) })),
@@ -73,7 +119,7 @@ export default function KdsPage() {
   async function move(ticketId: string, next: Ticket["status"]) {
     const res = await fetch(`${API}/api/kds/tickets/${ticketId}/status`, {
       method: "PATCH",
-      headers: { "content-type": "application/json", ...DEV_AUTH_HEADERS },
+      headers: { "content-type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ status: next })
     }).then((r) => r.json());
     setStatusText(res.ok ? "تم تحديث حالة التذكرة" : `فشل التحديث: ${res.error ?? "UNKNOWN"}`);

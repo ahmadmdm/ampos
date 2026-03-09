@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { apiFetch } from "../lib/api";
+import { API, apiFetch } from "../lib/api";
 
 interface DailySale { date: string; orders: number; revenue: number; avgTicket: number }
 interface TopProduct { nameAr: string; qty: number; revenue: number }
@@ -42,10 +42,10 @@ export default function ReportsPage() {
   const maxProductRev = Math.max(...topProducts.map((p) => p.revenue), 1);
 
   function exportCSV() {
-    window.open(`http://localhost:3001/api/admin/reports/export?branchId=${BRANCH}&range=${range}&format=csv`, "_blank");
+    window.open(`${API}/api/admin/reports/export?branchId=${BRANCH}&range=${range}&format=csv`, "_blank");
   }
   function exportJSON() {
-    window.open(`http://localhost:3001/api/admin/reports/export?branchId=${BRANCH}&range=${range}&format=json`, "_blank");
+    window.open(`${API}/api/admin/reports/export?branchId=${BRANCH}&range=${range}&format=json`, "_blank");
   }
 
   return (

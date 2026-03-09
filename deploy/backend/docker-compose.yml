@@ -1,0 +1,148 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/backend/Dockerfile
+    container_name: ampos-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    expose:
+      - "3001"
+
+  socket:
+    build:
+      context: ../..
+      dockerfile: deploy/backend/Dockerfile
+    container_name: ampos-socket
+    restart: unless-stopped
+    command: ["sh", "-c", "npx tsx src/realtime/socket-server.ts"]
+    working_dir: /app/apps/api
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "127.0.0.1:4001:4001"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ampos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ampos-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ampos-nginx
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8085:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  admin-web:
+    build:
+      context: ../..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        APP_PACKAGE: "@pos1/admin-web"
+        APP_PATH: apps/admin-web
+        APP_PORT: "3003"
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+        NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL}
+        NEXT_PUBLIC_APP_URL: ${ADMIN_WEB_URL}
+    container_name: ampos-admin-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3103:3003"
+
+  customer-web:
+    build:
+      context: ../..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        APP_PACKAGE: "@pos1/customer-web"
+        APP_PATH: apps/customer-web
+        APP_PORT: "3003"
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+        NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL}
+        NEXT_PUBLIC_APP_URL: ${CUSTOMER_WEB_URL}
+    container_name: ampos-customer-web
+    restart: unless-stopped
+    depends_on:
+      - api
+      - socket
+    ports:
+      - "127.0.0.1:3104:3003"
+
+  kds-web:
+    build:
+      context: ../..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        APP_PACKAGE: "@pos1/kds-web"
+        APP_PATH: apps/kds-web
+        APP_PORT: "3004"
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+        NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL}
+        NEXT_PUBLIC_APP_URL: ${KDS_WEB_URL}
+    container_name: ampos-kds-web
+    restart: unless-stopped
+    depends_on:
+      - api
+      - socket
+    ports:
+      - "127.0.0.1:3105:3004"
+
+  waiter-web:
+    build:
+      context: ../..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        APP_PACKAGE: "@pos1/waiter-web"
+        APP_PATH: apps/waiter-web
+        APP_PORT: "3005"
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+        NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL}
+        NEXT_PUBLIC_APP_URL: ${WAITER_WEB_URL}
+    container_name: ampos-waiter-web
+    restart: unless-stopped
+    depends_on:
+      - api
+      - socket
+    ports:
+      - "127.0.0.1:3106:3005"
+
+volumes:
+  postgres_data:
+  redis_data:

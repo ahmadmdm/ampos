@@ -1,7 +1,8 @@
 import { Prisma } from "@prisma/client";
+import { prisma } from "./prisma";
 
 type AuditInput = {
-  tx: Prisma.TransactionClient;
+  tx?: Prisma.TransactionClient;
   organizationId: string;
   branchId?: string;
   userId?: string;
@@ -14,7 +15,9 @@ type AuditInput = {
 };
 
 export async function writeAudit(input: AuditInput) {
-  await input.tx.auditLog.create({
+  const auditClient = input.tx ?? prisma;
+
+  await auditClient.auditLog.create({
     data: {
       organizationId: input.organizationId,
       branchId: input.branchId,

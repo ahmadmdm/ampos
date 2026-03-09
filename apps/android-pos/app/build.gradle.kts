@@ -21,13 +21,13 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3001\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://api.clo0.net\"")
         buildConfigField("String", "DEFAULT_BRANCH_ID", "\"br_demo\"")
         buildConfigField("String", "DEFAULT_ORG_ID", "\"org_demo\"")
         buildConfigField("String", "DEFAULT_DEVICE_CODE", "\"android_pos_01\"")
 
         manifestPlaceholders["appLabel"] = "POS1"
-        manifestPlaceholders["usesCleartextTraffic"] = "true"
+        manifestPlaceholders["usesCleartextTraffic"] = "false"
         manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config"
     }
 
@@ -36,14 +36,14 @@ android {
             dimension = "env"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3001\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://api.clo0.net\"")
             manifestPlaceholders["appLabel"] = "POS1 Dev"
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config"
         }
         create("prod") {
             dimension = "env"
-            buildConfigField("String", "API_BASE_URL", "\"https://api.pos1.example\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://api.clo0.net\"")
             manifestPlaceholders["appLabel"] = "POS1"
             manifestPlaceholders["usesCleartextTraffic"] = "false"
             manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config"

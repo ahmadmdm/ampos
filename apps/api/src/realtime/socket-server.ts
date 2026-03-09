@@ -3,6 +3,8 @@ import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { redisSubscriber } from "../lib/redis";
 import { verifyAccessToken } from "../lib/jwt";
+import { verifyTableToken } from "../lib/crypto";
+import { prisma } from "../lib/prisma";
 import { flushPendingOutboxEvents } from "./outbox";
 
 const port = Number(process.env.SOCKET_PORT ?? 4001);
@@ -21,46 +23,107 @@ const io = new Server(server, {
   }
 });
 
+type SocketAuth =
+  | {
+      kind: "user";
+      userId: string;
+      organizationId: string;
+      branchIds: string[];
+      roles: string[];
+    }
+  | {
+      kind: "table";
+      branchId: string;
+      tableId: string;
+    };
+
 // Auth middleware — verify JWT before allowing connection
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
-  if (!token || typeof token !== "string") {
+  if (typeof token === "string" && token) {
+    try {
+      const claims = verifyAccessToken(token);
+      (socket as any).auth = {
+        kind: "user",
+        userId: claims.sub,
+        organizationId: claims.org,
+        branchIds: claims.branches,
+        roles: claims.roles
+      } satisfies SocketAuth;
+      return next();
+    } catch {
+      return next(new Error("UNAUTHORIZED: invalid token"));
+    }
+  }
+
+  const tableToken = socket.handshake.auth?.tableToken || socket.handshake.query?.tableToken;
+  if (typeof tableToken !== "string" || !tableToken) {
     return next(new Error("UNAUTHORIZED: token required"));
   }
+
   try {
-    const claims = verifyAccessToken(token);
+    const branchId = socket.handshake.auth?.branchId || socket.handshake.query?.branchId;
+    if (typeof branchId !== "string" || !branchId) {
+      return next(new Error("UNAUTHORIZED: branch required"));
+    }
+
+    const branch = await prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { qrTokenSecret: true }
+    });
+    if (!branch) {
+      return next(new Error("UNAUTHORIZED: branch not found"));
+    }
+
+    const secret = branch.qrTokenSecret ?? process.env.QR_SIGNING_SECRET ?? "dev_qr_secret";
+    const payload = verifyTableToken(tableToken, secret);
+    if (!payload || payload.branchId !== branchId) {
+      return next(new Error("UNAUTHORIZED: invalid table token"));
+    }
+
     (socket as any).auth = {
-      userId: claims.sub,
-      organizationId: claims.org,
-      branchIds: claims.branches,
-      roles: claims.roles
-    };
-    next();
+      kind: "table",
+      branchId: payload.branchId,
+      tableId: payload.tableId
+    } satisfies SocketAuth;
+    return next();
   } catch {
-    next(new Error("UNAUTHORIZED: invalid token"));
+    return next(new Error("UNAUTHORIZED: invalid table token"));
   }
 });
 
 io.on("connection", (socket) => {
-  const auth = (socket as any).auth as { branchIds: string[]; roles: string[] };
+  const auth = (socket as any).auth as SocketAuth;
 
   socket.on("join-branch", (branchId: string) => {
-    if (auth.roles.includes("OWNER") || auth.branchIds.includes(branchId)) {
+    if (auth.kind === "user" && (auth.roles.includes("OWNER") || auth.branchIds.includes(branchId))) {
       socket.join(`branch:${branchId}`);
     }
   });
   socket.on("join-kds", (branchId: string) => {
-    if (auth.roles.includes("OWNER") || auth.branchIds.includes(branchId)) {
+    if (auth.kind === "user" && (auth.roles.includes("OWNER") || auth.branchIds.includes(branchId))) {
       socket.join(`kds:${branchId}`);
     }
   });
   socket.on("join-waiter", (branchId: string) => {
-    if (auth.roles.includes("OWNER") || auth.branchIds.includes(branchId)) {
+    if (auth.kind === "user" && (auth.roles.includes("OWNER") || auth.branchIds.includes(branchId))) {
       socket.join(`waiter:${branchId}`);
     }
   });
-  socket.on("join-order", (orderId: string) => {
-    socket.join(`order:${orderId}`);
+  socket.on("join-order", async (orderId: string) => {
+    if (auth.kind === "user") {
+      socket.join(`order:${orderId}`);
+      return;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { branchId: true, tableId: true }
+    });
+
+    if (order && order.branchId === auth.branchId && order.tableId === auth.tableId) {
+      socket.join(`order:${orderId}`);
+    }
   });
 });
 

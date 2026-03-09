@@ -143,6 +143,7 @@ export async function POST(req: NextRequest) {
     });
 
     await writeAudit({
+      tx: prisma,
       organizationId: ctx.organizationId,
       branchId,
       userId: ctx.userId,
@@ -265,6 +266,7 @@ export async function PUT(req: NextRequest) {
     });
 
     await writeAudit({
+      tx: prisma,
       organizationId: ctx.organizationId,
       branchId,
       userId: ctx.userId,
