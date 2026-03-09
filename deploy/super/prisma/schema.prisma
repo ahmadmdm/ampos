@@ -1,12 +1,11 @@
-# ─── Minimal Prisma schema for the super-admin service ────────────────────────
-# This schema is a READ/WRITE subset of the main apps/api/prisma/schema.prisma.
-# It connects to the SAME database but only declares the models the super-admin
-# service needs so it can generate a typed Prisma client.
-# DO NOT run "prisma migrate" from here — all migrations are owned by apps/api.
+// ─── Minimal Prisma schema for the super-admin service ────────────────────────
+// This schema is a READ/WRITE subset of the main apps/api/prisma/schema.prisma.
+// It connects to the SAME database but only declares the models the super-admin
+// service needs so it can generate a typed Prisma client.
+// DO NOT run "prisma migrate" from here — all migrations are owned by apps/api.
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/prisma-client"
 }
 
 datasource db {
@@ -21,7 +20,6 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   branches   Branch[]
-  devices    Device[]  @relation("OrgDevices")
   tenantMeta TenantMeta?
 }
 
@@ -45,8 +43,7 @@ model Device {
   lastSeenAt  DateTime?
   createdAt   DateTime @default(now())
 
-  branch      Branch       @relation(fields: [branchId], references: [id])
-  org         Organization @relation("OrgDevices", fields: [branchId], references: [id])
+  branch      Branch   @relation(fields: [branchId], references: [id])
 }
 
 model TenantMeta {

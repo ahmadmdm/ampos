@@ -28,3 +28,6 @@ RUN mkdir -p fonts && \
       "https://github.com/google/fonts/raw/main/ofl/amiri/Amiri-Regular.ttf" && \
     curl -fsSL -o fonts/Amiri-Bold.ttf \
       "https://github.com/google/fonts/raw/main/ofl/amiri/Amiri-Bold.ttf"
+
+EXPOSE 3001
+CMD ["npm", "run", "start"]

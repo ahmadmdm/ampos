@@ -7,7 +7,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./
-RUN npm install --omit=dev || npm install
+RUN npm install
 
 COPY prisma ./prisma
 COPY src     ./src
@@ -17,7 +17,7 @@ COPY tsconfig.json ./
 RUN npx prisma generate --schema prisma/schema.prisma
 
 # Build TypeScript
-RUN npx tsc --outDir dist
+RUN ./node_modules/.bin/tsc --outDir dist
 
 ENV NODE_ENV=production
 EXPOSE 3200

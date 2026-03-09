@@ -4,7 +4,7 @@
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { PrismaClient } = require("../prisma-client");
+const { PrismaClient } = require("@prisma/client");
 
 const globalWithPrisma = global as typeof globalThis & { prisma?: typeof PrismaClient };
 
