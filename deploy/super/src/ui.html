@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ampos · Super Admin</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+a{color:#38bdf8;text-decoration:none}
+/* ── Login ── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:40px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.login-card h1{font-size:22px;font-weight:700;margin-bottom:4px;color:#f8fafc}
+.login-card p{color:#94a3b8;font-size:14px;margin-bottom:28px}
+/* ── App shell ── */
+#app-screen{display:none;flex-direction:row;min-height:100vh}
+nav{width:220px;background:#1e293b;border-right:1px solid #334155;padding:24px 16px;display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+nav .logo{font-size:18px;font-weight:800;color:#f8fafc;padding:8px 12px;margin-bottom:16px;letter-spacing:-.5px}
+nav .logo span{color:#38bdf8}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:#94a3b8;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s}
+nav a:hover,nav a.active{background:#0f172a;color:#f8fafc}
+nav .spacer{flex:1}
+nav .logout-btn{background:none;border:1px solid #334155;color:#94a3b8;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:13px;text-align:left;width:100%;transition:all .15s}
+nav .logout-btn:hover{background:#0f172a;color:#f8fafc}
+main{flex:1;padding:32px;overflow-y:auto}
+/* ── Form elements ── */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;font-weight:500;color:#94a3b8;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f8fafc;font-size:14px;outline:none;transition:border .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#38bdf8}
+.field textarea{resize:vertical;min-height:80px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:#38bdf8;color:#0f172a}
+.btn-primary:hover{background:#7dd3fc}
+.btn-secondary{background:#1e293b;border:1px solid #334155;color:#e2e8f0}
+.btn-secondary:hover{background:#334155}
+.btn-danger{background:#dc2626;color:#fff}
+.btn-danger:hover{background:#b91c1c}
+.btn-warn{background:#d97706;color:#fff}
+.btn-warn:hover{background:#b45309}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+/* ── Cards & layouts ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.page-header h2{font-size:22px;font-weight:700;color:#f8fafc}
+.card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:24px;margin-bottom:16px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:16px;font-weight:600;color:#f8fafc}
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:10px 12px;color:#64748b;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #334155}
+td{padding:12px;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+/* ── Badges ── */
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600}
+.badge-green{background:#052e16;color:#4ade80;border:1px solid #166534}
+.badge-red{background:#450a0a;color:#f87171;border:1px solid #7f1d1d}
+.badge-yellow{background:#422006;color:#fbbf24;border:1px solid #78350f}
+.badge-blue{background:#0c1a2e;color:#38bdf8;border:1px solid #0c4a6e}
+/* ── Alert ── */
+.alert{padding:12px 16px;border-radius:8px;font-size:14px;margin-bottom:16px}
+.alert-error{background:#450a0a;border:1px solid #7f1d1d;color:#fca5a5}
+.alert-success{background:#052e16;border:1px solid #166534;color:#86efac}
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:18px;font-weight:700;color:#f8fafc;margin-bottom:20px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+/* ── Stat grid ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px}
+.stat{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:20px}
+.stat .val{font-size:28px;font-weight:800;color:#f8fafc}
+.stat .lbl{font-size:13px;color:#64748b;margin-top:4px}
+/* ── Spinner ── */
+.spinner{width:20px;height:20px;border:2px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading{display:none;text-align:center;padding:60px;color:#64748b}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN SCREEN ══════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>ampos <span style="color:#38bdf8">Super Admin</span></h1>
+    <p>Sign in to manage tenants & subscriptions</p>
+    <div id="login-error" class="alert alert-error" style="display:none"></div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="email" value="" placeholder="super@ampos.io" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" id="login-btn" onclick="login()">Sign in</button>
+  </div>
+</div>
+
+<!-- ══ APP SCREEN ════════════════════════════════════════════════════════════ -->
+<div id="app-screen">
+  <nav>
+    <div class="logo">am<span>pos</span></div>
+    <a id="nav-tenants" class="active" onclick="showPage('tenants')">🏢 Tenants</a>
+    <a id="nav-new"     onclick="showPage('new')">➕ New Tenant</a>
+    <div class="spacer"></div>
+    <button class="logout-btn" onclick="logout()">⎋ Sign out</button>
+  </nav>
+  <main>
+    <div id="loading"><div class="spinner"></div><br>Loading…</div>
+
+    <!-- Tenants page -->
+    <div id="page-tenants" style="display:none">
+      <div class="page-header">
+        <h2>Tenants</h2>
+        <button class="btn btn-secondary btn-sm" onclick="loadTenants()">↻ Refresh</button>
+      </div>
+      <div class="stats" id="stats-row"></div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table id="tenants-table">
+          <thead><tr>
+            <th>Organization</th><th>Plan</th><th>Devices</th><th>Subscription</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="tenants-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- New tenant page -->
+    <div id="page-new" style="display:none">
+      <div class="page-header"><h2>New Tenant</h2></div>
+      <div class="card" style="max-width:540px">
+        <div id="new-error" class="alert alert-error" style="display:none"></div>
+        <div id="new-success" class="alert alert-success" style="display:none"></div>
+        <div class="field"><label>Organization Name *</label><input type="text" id="new-name"></div>
+        <div class="field"><label>Contact Email</label><input type="email" id="new-email"></div>
+        <div class="field"><label>Contact Phone</label><input type="tel" id="new-phone"></div>
+        <div class="field"><label>Plan</label>
+          <select id="new-plan">
+            <option value="trial">Trial</option>
+            <option value="starter">Starter</option>
+            <option value="professional">Professional</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </div>
+        <div class="field"><label>Max Devices</label><input type="number" id="new-max" value="3" min="1"></div>
+        <div class="field"><label>Subscription End</label><input type="date" id="new-end"></div>
+        <div class="field"><label>Notes</label><textarea id="new-notes"></textarea></div>
+        <button class="btn btn-primary" onclick="createTenant()">Create Tenant</button>
+      </div>
+    </div>
+
+    <!-- Tenant detail page -->
+    <div id="page-detail" style="display:none">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-secondary btn-sm" onclick="showPage('tenants')">← Back</button>
+          <h2 id="detail-name"></h2>
+          <span id="detail-badge"></span>
+        </div>
+        <div style="display:flex;gap:8px" id="detail-actions"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <!-- Meta card -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Subscription</span>
+            <button class="btn btn-secondary btn-sm" onclick="openEditModal()">Edit</button>
+          </div>
+          <div id="detail-meta"></div>
+        </div>
+        <!-- Branches -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Branches</span></div>
+          <div id="detail-branches"></div>
+        </div>
+      </div>
+
+      <!-- Devices -->
+      <div class="card" style="margin-top:0;padding:0;overflow:hidden">
+        <div style="padding:16px 20px;border-bottom:1px solid #334155" class="card-header">
+          <span class="card-title">Devices</span>
+        </div>
+        <table>
+          <thead><tr><th>Name</th><th>Code</th><th>Platform</th><th>Branch</th><th>Last Seen</th><th></th></tr></thead>
+          <tbody id="detail-devices"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ EDIT MODAL ════════════════════════════════════════════════════════════ -->
+<div id="edit-modal" class="modal-overlay" style="display:none" onclick="closeModalOnOverlay(event)">
+  <div class="modal">
+    <h3>Edit Tenant</h3>
+    <div id="edit-error" class="alert alert-error" style="display:none"></div>
+    <div class="field"><label>Plan</label>
+      <select id="edit-plan">
+        <option value="trial">Trial</option><option value="starter">Starter</option>
+        <option value="professional">Professional</option><option value="enterprise">Enterprise</option>
+      </select>
+    </div>
+    <div class="field"><label>Max Devices</label><input type="number" id="edit-max" min="1"></div>
+    <div class="field"><label>Subscription Start</label><input type="date" id="edit-start"></div>
+    <div class="field"><label>Subscription End</label><input type="date" id="edit-end"></div>
+    <div class="field"><label>Contact Email</label><input type="email" id="edit-email"></div>
+    <div class="field"><label>Contact Phone</label><input type="tel" id="edit-phone"></div>
+    <div class="field"><label>Notes</label><textarea id="edit-notes"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';          // same origin
+let TOKEN = localStorage.getItem('sa_token') || '';
+let currentTenant = null;
+
+// ── Utils ────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  if (body)  opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || data.message || r.status);
+  return data;
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
+}
+// Convert YYYY-MM-DD to ISO datetime string for the API
+function toISO(dateStr) {
+  return dateStr ? new Date(dateStr).toISOString() : undefined;
+}
+function planBadge(p) {
+  const m = {trial:'badge-yellow',starter:'badge-blue',professional:'badge-green',enterprise:'badge-blue'};
+  return `<span class="badge ${m[p]||'badge-blue'}">${p||'—'}</span>`;
+}
+// Convert YYYY-MM-DD date input to ISO datetime string for the API
+function toISO(dateStr) {
+  return dateStr ? new Date(dateStr).toISOString() : undefined;
+}
+function showAlert(id, msg, type='error') {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = `alert alert-${type}`;
+  el.style.display = 'block';
+  if (type === 'success') setTimeout(() => el.style.display='none', 3000);
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+async function login() {
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const d = await api('POST', '/auth/login', {
+      email:    document.getElementById('email').value,
+      password: document.getElementById('password').value,
+    });
+    TOKEN = d.token;
+    localStorage.setItem('sa_token', TOKEN);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'flex';
+    showPage('tenants');
+  } catch(e) {
+    showAlert('login-error', e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+}
+function logout() {
+  TOKEN = ''; localStorage.removeItem('sa_token');
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+document.getElementById('password').addEventListener('keydown', e => e.key==='Enter' && login());
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function showPage(p) {
+  ['tenants','new','detail'].forEach(n => {
+    document.getElementById('page-'+n).style.display = n===p ? 'block' : 'none';
+    const nav = document.getElementById('nav-'+n);
+    if (nav) nav.classList.toggle('active', n===p);
+  });
+  if (p === 'tenants') loadTenants();
+}
+
+// ── Tenants list ──────────────────────────────────────────────────────────────
+async function loadTenants() {
+  const loading = document.getElementById('loading');
+  const page    = document.getElementById('page-tenants');
+  loading.style.display = 'block'; page.style.display = 'none';
+  try {
+    const resp    = await api('GET', '/tenants');   // { data: [...], total: N }
+    const tenants = Array.isArray(resp) ? resp : (resp.data || []);
+    renderStats(tenants);
+    renderTable(tenants);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    loading.style.display = 'none'; page.style.display = 'block';
+  }
+}
+function renderStats(tenants) {
+  const total     = tenants.length;
+  const active    = tenants.filter(t => !t.subscription?.isSuspended).length;
+  const suspended = tenants.filter(t =>  t.subscription?.isSuspended).length;
+  const devices   = tenants.reduce((s,t) => s + (t.deviceCount||0), 0);
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat"><div class="val">${total}</div><div class="lbl">Total Tenants</div></div>
+    <div class="stat"><div class="val" style="color:#4ade80">${active}</div><div class="lbl">Active</div></div>
+    <div class="stat"><div class="val" style="color:#f87171">${suspended}</div><div class="lbl">Suspended</div></div>
+    <div class="stat"><div class="val">${devices}</div><div class="lbl">Total Devices</div></div>`;
+}
+function renderTable(tenants) {
+  const tbody = document.getElementById('tenants-body');
+  if (!tenants.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#475569">No tenants yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = tenants.map(t => {
+    const sub  = t.subscription || {};
+    const susp = sub.isSuspended;
+    const exp  = sub.subscriptionEnd ? new Date(sub.subscriptionEnd) < new Date() : false;
+    const status = susp
+      ? `<span class="badge badge-red">Suspended</span>`
+      : exp
+        ? `<span class="badge badge-yellow">Expired</span>`
+        : `<span class="badge badge-green">Active</span>`;
+    return `<tr onclick="openDetail('${t.id}')" style="cursor:pointer">
+      <td><strong style="color:#f8fafc">${t.name}</strong><br><span style="color:#475569;font-size:12px">${t.id}</span></td>
+      <td>${planBadge(sub.plan)}</td>
+      <td>${t.deviceCount||0} / ${sub.maxDevices||'—'}</td>
+      <td style="font-size:13px">${fmtDate(sub.subscriptionEnd)}</td>
+      <td>${status}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openDetail('${t.id}')">View →</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Tenant detail ─────────────────────────────────────────────────────────────
+async function openDetail(id) {
+  const loading = document.getElementById('loading');
+  loading.style.display = 'block';
+  ['tenants','new','detail'].forEach(n => document.getElementById('page-'+n).style.display='none');
+  try {
+    const t = await api('GET', '/tenants/' + id);
+    currentTenant = t;
+    renderDetail(t);
+    loading.style.display = 'none';
+    document.getElementById('page-detail').style.display = 'block';
+  } catch(e) {
+    loading.style.display = 'none';
+    alert('Error: ' + e.message);
+    showPage('tenants');
+  }
+}
+function renderDetail(t) {
+  const meta = t.tenantMeta || {};
+  document.getElementById('detail-name').textContent = t.name;
+  document.getElementById('detail-badge').innerHTML = meta.isSuspended
+    ? '<span class="badge badge-red">Suspended</span>'
+    : '<span class="badge badge-green">Active</span>';
+
+  // Actions
+  const actEl = document.getElementById('detail-actions');
+  actEl.innerHTML = meta.isSuspended
+    ? `<button class="btn btn-secondary btn-sm" onclick="activateTenant('${t.id}')">✓ Activate</button>`
+    : `<button class="btn btn-warn btn-sm" onclick="suspendTenant('${t.id}')">⊘ Suspend</button>`;
+
+  // Meta
+  document.getElementById('detail-meta').innerHTML = `
+    <table style="font-size:14px;width:100%">
+      <tr><td style="color:#64748b;padding:6px 0;width:40%">Plan</td><td>${planBadge(meta.plan)}</td></tr>
+      <tr><td style="color:#64748b;padding:6px 0">Max Devices</td><td>${meta.maxDevices||'—'}</td></tr>
+      <tr><td style="color:#64748b;padding:6px 0">Sub Start</td><td>${fmtDate(meta.subscriptionStart)}</td></tr>
+      <tr><td style="color:#64748b;padding:6px 0">Sub End</td><td>${fmtDate(meta.subscriptionEnd)}</td></tr>
+      <tr><td style="color:#64748b;padding:6px 0">Email</td><td>${meta.contactEmail||'—'}</td></tr>
+      <tr><td style="color:#64748b;padding:6px 0">Phone</td><td>${meta.contactPhone||'—'}</td></tr>
+      <tr><td style="color:#64748b;padding:6px 0">Notes</td><td style="white-space:pre-wrap">${meta.notes||'—'}</td></tr>
+    </table>`;
+
+  // Branches
+  document.getElementById('detail-branches').innerHTML = (t.branches||[]).length
+    ? (t.branches||[]).map(b => `<div style="padding:6px 0;border-bottom:1px solid #334155;font-size:14px">
+        <strong style="color:#f8fafc">${b.name}</strong>
+        <span style="color:#475569;font-size:12px;margin-left:8px">${b.code}</span></div>`).join('')
+    : '<p style="color:#475569;font-size:14px">No branches</p>';
+
+  // Devices
+  const devBody = document.getElementById('detail-devices');
+  const devices = (t.branches||[]).flatMap(b => (b.devices||[]).map(d => ({...d, branchName: b.name})));
+  devBody.innerHTML = devices.length
+    ? devices.map(d => `<tr>
+        <td>${d.name}</td><td style="font-family:monospace;font-size:13px">${d.code}</td>
+        <td>${d.platform}</td><td style="color:#64748b">${d.branchName}</td>
+        <td style="color:#64748b;font-size:13px">${fmtDate(d.lastSeenAt)}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="revokeDevice('${t.id}','${d.id}')">Revoke</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;padding:24px;color:#475569">No devices registered</td></tr>';
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+async function suspendTenant(id) {
+  const reason = prompt('Suspension reason (optional):') ?? '';
+  if (reason === null) return;
+  try {
+    await api('PATCH', `/tenants/${id}/suspend`, { reason });
+    openDetail(id);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+async function activateTenant(id) {
+  try {
+    await api('PATCH', `/tenants/${id}/activate`);
+    openDetail(id);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+async function revokeDevice(tenantId, deviceId) {
+  if (!confirm('Revoke this device? The device will need to re-pair.')) return;
+  try {
+    await api('DELETE', `/tenants/${tenantId}/devices/${deviceId}`);
+    openDetail(tenantId);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+async function createTenant() {
+  try {
+    const body = {
+      name:              document.getElementById('new-name').value,
+      plan:              document.getElementById('new-plan').value,
+      maxDevices:        parseInt(document.getElementById('new-max').value) || 3,
+      contactEmail:      document.getElementById('new-email').value || undefined,
+      contactPhone:      document.getElementById('new-phone').value || undefined,
+      subscriptionEnd:   document.getElementById('new-end').value   || undefined,
+      notes:             document.getElementById('new-notes').value  || undefined,
+    };
+    await api('POST', '/tenants', body);
+    showAlert('new-success', 'Tenant created successfully!', 'success');
+    ['new-name','new-email','new-phone','new-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('new-plan').value = 'trial';
+    document.getElementById('new-max').value  = '3';
+  } catch(e) { showAlert('new-error', e.message); }
+}
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
+function openEditModal() {
+  if (!currentTenant) return;
+  const meta = currentTenant.tenantMeta || {};
+  document.getElementById('edit-plan').value  = meta.plan        || 'trial';
+  document.getElementById('edit-max').value   = meta.maxDevices  || 3;
+  document.getElementById('edit-start').value = meta.subscriptionStart ? meta.subscriptionStart.slice(0,10) : '';
+  document.getElementById('edit-end').value   = meta.subscriptionEnd   ? meta.subscriptionEnd.slice(0,10)   : '';
+  document.getElementById('edit-email').value = meta.contactEmail  || '';
+  document.getElementById('edit-phone').value = meta.contactPhone  || '';
+  document.getElementById('edit-notes').value = meta.notes         || '';
+  document.getElementById('edit-error').style.display = 'none';
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('edit-modal')) closeEditModal();
+}
+async function saveEdit() {
+  try {
+    const startStr = document.getElementById('edit-start').value;
+    const endStr   = document.getElementById('edit-end').value;
+    const body = {
+      plan:              document.getElementById('edit-plan').value,
+      maxDevices:        parseInt(document.getElementById('edit-max').value)||3,
+      subscriptionStart: toISO(startStr),
+      subscriptionEnd:   toISO(endStr),
+      contactEmail:      document.getElementById('edit-email').value || undefined,
+      contactPhone:      document.getElementById('edit-phone').value || undefined,
+      notes:             document.getElementById('edit-notes').value || undefined,
+    };
+    // remove undefined keys
+    Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+    await api('PATCH', '/tenants/' + currentTenant.id, body);
+    closeEditModal();
+    openDetail(currentTenant.id);
+  } catch(e) { showAlert('edit-error', e.message); }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(function init() {
+  if (TOKEN) {
+    api('GET', '/tenants').then(() => {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'flex';
+      showPage('tenants');
+    }).catch(() => {
+      TOKEN = ''; localStorage.removeItem('sa_token');
+      // show login screen (already visible by default)
+    });
+  }
+  // Bind Enter key on email too
+  document.getElementById('email').addEventListener('keydown', e => e.key==='Enter' && document.getElementById('password').focus());
+})();
+</script>
+</body>
+</html>

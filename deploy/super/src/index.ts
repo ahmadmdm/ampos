@@ -9,6 +9,8 @@
  */
 
 import express from "express";
+import path    from "path";
+import fs      from "fs";
 import rateLimit from "express-rate-limit";
 import { authRouter }    from "./routes/auth";
 import { tenantsRouter } from "./routes/tenants";
@@ -48,6 +50,18 @@ app.use("/tenants", requireSuperAdmin, tenantsRouter);
 
 // Health check (unauthenticated — used by Caddy health checks)
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+// Super-admin UI (served at root so the browser gets an actual page)
+const UI_PATH = path.join(__dirname, "../src/ui.html");
+const uiHtml  = fs.existsSync(UI_PATH) ? fs.readFileSync(UI_PATH, "utf8") : null;
+app.get("/", (_req, res) => {
+  if (uiHtml) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(uiHtml);
+  } else {
+    res.json({ service: "ampos-super", status: "ok" });
+  }
+});
 
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
