@@ -25,6 +25,32 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://api.clo0.net";
 
+// Attempt a silent token refresh. Returns new accessToken or null.
+export async function tryRefreshToken(): Promise<string | null> {
+  try {
+    const stored = localStorage.getItem("pos1_auth");
+    if (!stored) return null;
+    const { refreshToken } = JSON.parse(stored);
+    if (!refreshToken) return null;
+    const res = await fetch(`${API}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const json = await res.json();
+    if (!json.ok) {
+      localStorage.removeItem("pos1_auth");
+      return null;
+    }
+    const { accessToken: newAccess, refreshToken: newRefresh } = json.data;
+    const parsed = JSON.parse(stored);
+    localStorage.setItem("pos1_auth", JSON.stringify({ ...parsed, accessToken: newAccess, refreshToken: newRefresh }));
+    return newAccess;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,

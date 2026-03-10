@@ -1,26 +1,36 @@
-import { getStoredToken } from "./auth-context";
+import { getStoredToken, tryRefreshToken } from "./auth-context";
 
 export const API = process.env.NEXT_PUBLIC_API_URL || "https://api.clo0.net";
 
-function getAuthHeaders(): Record<string, string> {
-  const token = getStoredToken();
-  if (token) return { authorization: `Bearer ${token}` };
-  // Fallback for dev — will only work with ALLOW_INSECURE_HEADER_AUTH=true
-  return {
-    "x-roles": "OWNER",
-    "x-org-id": "org_demo",
-    "x-branch-id": "br_demo",
-    "x-user-id": "owner_demo",
-  };
+function getAuthHeaders(token?: string | null): Record<string, string> {
+  const t = token ?? getStoredToken();
+  if (t) return { authorization: `Bearer ${t}` };
+  return {};
 }
 
 export async function apiFetch<T = unknown>(
   path: string,
   opts?: RequestInit
 ): Promise<{ ok: boolean; data?: T; error?: string }> {
-  const res = await fetch(`${API}${path}`, {
-    ...opts,
-    headers: { "content-type": "application/json", ...getAuthHeaders(), ...opts?.headers },
-  });
+  const doFetch = (token?: string | null) =>
+    fetch(`${API}${path}`, {
+      ...opts,
+      headers: { "content-type": "application/json", ...getAuthHeaders(token), ...opts?.headers },
+    });
+
+  let res = await doFetch();
+
+  // On 401, attempt silent token refresh once
+  if (res.status === 401) {
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      res = await doFetch(newToken);
+    } else {
+      // Refresh failed — redirect to login
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { ok: false, error: "SESSION_EXPIRED" };
+    }
+  }
+
   return res.json();
 }
