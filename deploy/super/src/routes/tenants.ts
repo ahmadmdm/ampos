@@ -24,24 +24,28 @@ tenantsRouter.get("/", async (_req: Request, res: Response) => {
   const orgs = await prisma.organization.findMany({
     include: {
       tenantMeta: true,
-      branches:   { select: { id: true, code: true, name: true } },
-      _count:     { select: { devices: true } },
+      branches: {
+        select: {
+          id: true, code: true, name: true,
+          _count: { select: { devices: true } },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
   const result = orgs.map((org: any) => ({
-    id:            org.id,
-    name:          org.name,
-    createdAt:     org.createdAt,
-    deviceCount:   org._count.devices,
-    branchCount:   org.branches.length,
+    id:          org.id,
+    name:        org.name,
+    createdAt:   org.createdAt,
+    deviceCount: org.branches.reduce((s: number, b: any) => s + (b._count?.devices ?? 0), 0),
+    branchCount: org.branches.length,
     subscription: {
-      plan:             org.tenantMeta?.plan            ?? "trial",
-      maxDevices:       org.tenantMeta?.maxDevices       ?? 3,
-      subscriptionEnd:  org.tenantMeta?.subscriptionEnd  ?? null,
-      isSuspended:      org.tenantMeta?.isSuspended      ?? false,
-      contactEmail:     org.tenantMeta?.contactEmail     ?? null,
+      plan:            org.tenantMeta?.plan            ?? "trial",
+      maxDevices:      org.tenantMeta?.maxDevices       ?? 3,
+      subscriptionEnd: org.tenantMeta?.subscriptionEnd  ?? null,
+      isSuspended:     org.tenantMeta?.isSuspended      ?? false,
+      contactEmail:    org.tenantMeta?.contactEmail     ?? null,
     },
   }));
 
