@@ -1,11 +1,13 @@
 import "dotenv/config";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
+import { z } from "zod";
 import { redisSubscriber } from "../lib/redis";
 import { verifyAccessToken } from "../lib/jwt";
 import { verifyTableToken } from "../lib/crypto";
 import { prisma } from "../lib/prisma";
 import { flushPendingOutboxEvents } from "./outbox";
+import { logger } from "../lib/logger";
 
 const port = Number(process.env.SOCKET_PORT ?? 4001);
 
@@ -127,15 +129,22 @@ io.on("connection", (socket) => {
   });
 });
 
+const RealtimeEventSchema = z.object({
+  event: z.string().min(1),
+  branchId: z.string().min(1),
+  payload: z.object({ orderId: z.string().optional() }).passthrough(),
+});
+
 if (redisSubscriber) {
   redisSubscriber.subscribe("rt:events");
   redisSubscriber.on("message", (_channel, message) => {
     try {
-      const event = JSON.parse(message) as {
-        event: string;
-        branchId: string;
-        payload: { orderId?: string };
-      };
+      const parsed = RealtimeEventSchema.safeParse(JSON.parse(message));
+      if (!parsed.success) {
+        logger.warn("Dropping invalid realtime event", { message, errors: parsed.error.flatten() });
+        return;
+      }
+      const event = parsed.data;
 
       io.to(`branch:${event.branchId}`).emit(event.event, event);
       io.to(`kds:${event.branchId}`).emit(event.event, event);
@@ -144,13 +153,13 @@ if (redisSubscriber) {
         io.to(`order:${event.payload.orderId}`).emit(event.event, event);
       }
     } catch (error) {
-      console.error("Failed to parse realtime event", error);
+      logger.error("Failed to parse realtime event", error, { message });
     }
   });
 }
 
 server.listen(port, () => {
-  console.log(`Socket server listening on ${port}`);
+  logger.info(`Socket server listening on port ${port}`);
 });
 
 // ─── Outbox Poller ─── flush stuck OUTBOX_PENDING events every 30s
@@ -161,10 +170,10 @@ async function pollOutbox() {
   try {
     const result = await flushPendingOutboxEvents(100);
     if (result.sent > 0 || result.failed > 0) {
-      console.log(`[outbox-poller] sent=${result.sent} failed=${result.failed}`);
+      logger.info("outbox-poller flushed", { sent: result.sent, failed: result.failed });
     }
   } catch (err) {
-    console.error("[outbox-poller] error:", err);
+    logger.error("outbox-poller error", err);
   }
 }
 
@@ -174,7 +183,7 @@ pollOutbox();
 
 // Graceful shutdown
 function shutdown() {
-  console.log("[socket-server] shutting down...");
+  logger.info("socket-server shutting down");
   if (outboxTimer) clearInterval(outboxTimer);
   io.close();
   server.close();

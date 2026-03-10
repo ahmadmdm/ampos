@@ -8,9 +8,17 @@ export interface AuthContext {
   roles: string[];
 }
 
-const allowInsecureHeaderAuth =
-  process.env.ALLOW_INSECURE_HEADER_AUTH === "true" ||
-  process.env.NODE_ENV !== "production";
+/**
+ * Insecure header-based auth is ONLY allowed when:
+ *   1. Explicitly opted-in via ALLOW_INSECURE_HEADER_AUTH=true  AND
+ *   2. The request originates from localhost (not a remote caller)
+ * This prevents remote spoofing in staging/docker environments.
+ */
+function isInsecureHeaderAuthAllowed(req: NextRequest): boolean {
+  if (process.env.ALLOW_INSECURE_HEADER_AUTH !== "true") return false;
+  const host = req.headers.get("host") ?? "";
+  return host.startsWith("localhost") || host.startsWith("127.0.0.1");
+}
 
 function fromHeaders(req: NextRequest): AuthContext {
   const org = req.headers.get("x-org-id");
@@ -43,7 +51,7 @@ export function getAuthContext(req: NextRequest): AuthContext {
     };
   }
 
-  if (!allowInsecureHeaderAuth) {
+  if (!isInsecureHeaderAuthAllowed(req)) {
     throw new Error("UNAUTHORIZED");
   }
 

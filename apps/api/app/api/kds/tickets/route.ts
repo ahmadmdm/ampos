@@ -13,19 +13,40 @@ export async function GET(req: NextRequest) {
     assertBranchScope(ctx, branchId);
     const station = req.nextUrl.searchParams.get("station");
 
-    const tickets = await prisma.kitchenTicket.findMany({
-      where: { branchId },
-      include: {
-        items: {
-          where: station ? { station: { code: station } } : undefined,
-          include: { orderItem: true, station: true }
-        },
-        order: true
-      },
-      orderBy: { createdAt: "desc" }
-    });
+    // Pagination: default 50 active tickets per page
+    const limit = Math.min(100, Math.max(1, Number(req.nextUrl.searchParams.get("limit") ?? 50)));
+    const page  = Math.max(1, Number(req.nextUrl.searchParams.get("page") ?? 1));
+    const skip  = (page - 1) * limit;
 
-    return ok(tickets);
+    const [tickets, total] = await Promise.all([
+      prisma.kitchenTicket.findMany({
+        where: { branchId },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          startedAt: true,
+          readyAt: true,
+          servedAt: true,
+          order: { select: { id: true, orderNo: true, table: { select: { code: true } } } },
+          items: {
+            where: station ? { station: { code: station } } : undefined,
+            select: {
+              id: true,
+              status: true,
+              orderItem: { select: { itemNameAr: true, qty: true } },
+              station: { select: { id: true, code: true, nameAr: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.kitchenTicket.count({ where: { branchId } }),
+    ]);
+
+    return ok({ tickets, total, page, limit });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "UNKNOWN_ERROR";
     const status = msg.includes("FORBIDDEN")

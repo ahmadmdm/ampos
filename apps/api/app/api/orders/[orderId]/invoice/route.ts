@@ -7,6 +7,7 @@ import { getAuthContext } from "@/src/lib/auth";
 import { assertPermission } from "@/src/lib/rbac";
 import { assertBranchScope } from "@/src/lib/tenant";
 import { writeAudit } from "@/src/lib/audit";
+import { logger } from "@/src/lib/logger";
 import PDFDocument from "pdfkit";
 import { generateZatcaInvoice, retryZatcaSubmission, ZatcaStatus } from "@/src/zatca";
 import { decodeQrTlv } from "@/src/zatca/qr-tlv";
@@ -307,8 +308,19 @@ export async function GET(
     if (zatcaConfig?.isActive) {
       try {
         zatcaResult = await generateZatcaInvoice(order as any);
+        // If ZATCA API submission failed but XML was generated, queue for retry
+        if (
+          zatcaResult &&
+          zatcaResult.zatcaStatus !== ZatcaStatus.REPORTED &&
+          zatcaResult.zatcaStatus !== ZatcaStatus.CLEARED
+        ) {
+          logger.warn("ZATCA submission pending/failed — will retry after invoice saved", {
+            orderId: order.id,
+            zatcaStatus: zatcaResult.zatcaStatus,
+          });
+        }
       } catch (err) {
-        console.error("[Invoice] ZATCA generation failed, falling back to basic invoice:", err);
+        logger.warn("ZATCA generation failed, falling back to basic invoice", { orderId: order.id, branchId: order.branchId, error: String(err) });
         // Continue with basic PDF-only invoice
       }
     }
@@ -376,6 +388,18 @@ export async function GET(
 
       return inv;
     });
+
+    // If ZATCA XML was generated but not yet reported/cleared, schedule async retry
+    if (
+      invoice.zatcaXml &&
+      invoice.zatcaStatus !== ZatcaStatus.REPORTED &&
+      invoice.zatcaStatus !== ZatcaStatus.CLEARED
+    ) {
+      // Fire-and-forget retry — does not block the response
+      retryZatcaSubmission(invoice.id).catch((err) =>
+        logger.error("ZATCA retry failed", err, { invoiceId: invoice.id })
+      );
+    }
 
     // Return based on format
     if (format === "xml" && invoice.zatcaXml) {

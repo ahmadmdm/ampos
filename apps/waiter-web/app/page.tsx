@@ -64,17 +64,21 @@ export default function WaiterPage() {
 
   async function fetchAll() {
     if (!accessToken) return;
-    const [callsRes, readyRes] = await Promise.all([
-      fetch(`${API}/api/waiter/calls?branchId=${BRANCH_ID}`, { headers: getAuthHeaders() }).then((r) => r.json()),
-      fetch(`${API}/api/waiter/ready-queue?branchId=${BRANCH_ID}`, { headers: getAuthHeaders() }).then((r) => r.json())
-    ]);
+    try {
+      const [callsRes, readyRes] = await Promise.all([
+        fetch(`${API}/api/waiter/calls?branchId=${BRANCH_ID}`, { headers: getAuthHeaders() }).then((r) => r.json()),
+        fetch(`${API}/api/waiter/ready-queue?branchId=${BRANCH_ID}`, { headers: getAuthHeaders() }).then((r) => r.json())
+      ]);
 
-    setCalls(callsRes.data ?? []);
-    setReady(readyRes.data ?? []);
-    if (callsRes.ok && readyRes.ok) {
-      setStatusText(`النداءات: ${callsRes.data?.length ?? 0} | الجاهز: ${readyRes.data?.length ?? 0}`);
-    } else {
-      setStatusText(`فشل التحديث: ${callsRes.error ?? readyRes.error ?? "UNKNOWN"}`);
+      setCalls(callsRes.data ?? []);
+      setReady(readyRes.data ?? []);
+      if (callsRes.ok && readyRes.ok) {
+        setStatusText(`النداءات: ${callsRes.data?.length ?? 0} | الجاهز: ${readyRes.data?.length ?? 0}`);
+      } else {
+        setStatusText(`فشل التحديث: ${callsRes.error ?? readyRes.error ?? "UNKNOWN"}`);
+      }
+    } catch (err) {
+      setStatusText(`خطأ في الاتصال: ${(err as Error).message}`);
     }
   }
 

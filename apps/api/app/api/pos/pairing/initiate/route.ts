@@ -22,6 +22,7 @@ import { getAuthContext } from "@/src/lib/auth";
 import { assertPermission } from "@/src/lib/rbac";
 import { assertBranchScope } from "@/src/lib/tenant";
 import { redis } from "@/src/lib/redis";
+import { rateLimit } from "@/src/lib/rate-limit";
 
 /** Pairing session lives for 5 minutes — longer is a security risk */
 const PAIRING_TTL_SECONDS = 300;
@@ -34,6 +35,10 @@ export async function POST(req: NextRequest) {
     const { branchId } = (await req.json()) as { branchId?: string };
     if (!branchId) return fail("branchId is required", 400);
     assertBranchScope(ctx, branchId);
+
+    // 3 pairing attempts per branch per 5 minutes — prevent code enumeration
+    const allowed = await rateLimit(`pairing:${branchId}`, 3, 300);
+    if (!allowed) return fail("TOO_MANY_REQUESTS", 429);
 
     // 6-digit human-readable code (for manual fallback entry on the iPad)
     const humanCode = Math.floor(100_000 + Math.random() * 900_000).toString();

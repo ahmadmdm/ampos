@@ -5,10 +5,15 @@ import { signAccessToken, signRefreshToken } from "@/src/lib/jwt";
 import { verifyPassword } from "@/src/lib/password";
 import { sha256 } from "@/src/lib/crypto";
 import { randomUUID } from "node:crypto";
+import { rateLimit } from "@/src/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as { email?: string; password?: string };
   if (!body.email || !body.password) return fail("email and password are required", 400);
+
+  // 10 attempts per email per 15 minutes — brute force protection
+  const allowed = await rateLimit(`login:${body.email.toLowerCase()}`, 10, 900);
+  if (!allowed) return fail("TOO_MANY_REQUESTS", 429);
 
   const user = await prisma.user.findUnique({
     where: { email: body.email },

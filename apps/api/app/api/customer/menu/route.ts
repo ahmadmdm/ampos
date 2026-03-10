@@ -15,22 +15,41 @@ export async function GET(req: NextRequest) {
 
   const categories = await prisma.category.findMany({
     where: { branchId },
+    select: { id: true, nameAr: true, nameEn: true, sortOrder: true },
     orderBy: { sortOrder: "asc" }
   });
 
   const products = await prisma.product.findMany({
     where: { branchId, isActive: true },
-    include: {
-      variants: true,
+    select: {
+      id: true,
+      nameAr: true,
+      nameEn: true,
+      descriptionAr: true,
+      basePrice: true,
+      imageUrl: true,
+      categoryId: true,
+      variants: {
+        select: { id: true, nameAr: true, priceDelta: true, isDefault: true }
+      },
       modifierGroups: {
-        include: {
+        select: {
           modifierGroup: {
-            include: { options: { where: { isActive: true } }
-            }
-          }
-        }
-      }
-    }
+            select: {
+              id: true,
+              nameAr: true,
+              minSelect: true,
+              maxSelect: true,
+              options: {
+                where: { isActive: true },
+                select: { id: true, nameAr: true, priceDelta: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: [{ categoryId: "asc" }],
   });
 
   return ok({ categories, products });

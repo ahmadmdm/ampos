@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { flushPendingOutboxEvents } from "../../../../src/realtime/outbox";
+import { logger } from "../../../../src/lib/logger";
 
 /**
  * GET /api/admin/outbox-flush
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
       flushedAt: new Date().toISOString(),
     });
   } catch (err: any) {
-    console.error("[outbox-flush] Error:", err);
+    logger.error("outbox-flush error", err);
     return NextResponse.json(
       { ok: false, error: err.message ?? "Unknown error" },
       { status: 500 }

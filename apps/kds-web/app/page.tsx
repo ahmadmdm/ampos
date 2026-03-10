@@ -79,9 +79,13 @@ export default function KdsPage() {
   async function fetchTickets() {
     if (!accessToken) return;
     const query = stationFilter === "ALL" ? "" : `&station=${stationFilter}`;
-    const res = await fetch(`${API}/api/kds/tickets?branchId=${BRANCH_ID}${query}`, { headers: getAuthHeaders() }).then((r) => r.json());
-    setTickets(res.data ?? []);
-    setStatusText(res.ok ? `تم تحديث ${res.data?.length ?? 0} تذكرة` : `فشل الجلب: ${res.error ?? "UNKNOWN"}`);
+    try {
+      const res = await fetch(`${API}/api/kds/tickets?branchId=${BRANCH_ID}${query}`, { headers: getAuthHeaders() }).then((r) => r.json());
+      setTickets(res.data?.tickets ?? res.data ?? []);
+      setStatusText(res.ok ? `تم تحديث ${(res.data?.tickets ?? res.data)?.length ?? 0} تذكرة` : `فشل الجلب: ${res.error ?? "UNKNOWN"}`);
+    } catch (err) {
+      setStatusText(`خطأ في الاتصال: ${(err as Error).message}`);
+    }
   }
 
   useEffect(() => {
@@ -117,12 +121,16 @@ export default function KdsPage() {
   );
 
   async function move(ticketId: string, next: Ticket["status"]) {
-    const res = await fetch(`${API}/api/kds/tickets/${ticketId}/status`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ status: next })
-    }).then((r) => r.json());
-    setStatusText(res.ok ? "تم تحديث حالة التذكرة" : `فشل التحديث: ${res.error ?? "UNKNOWN"}`);
+    try {
+      const res = await fetch(`${API}/api/kds/tickets/${ticketId}/status`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ status: next })
+      }).then((r) => r.json());
+      setStatusText(res.ok ? "تم تحديث حالة التذكرة" : `فشل التحديث: ${res.error ?? "UNKNOWN"}`);
+    } catch (err) {
+      setStatusText(`خطأ في الاتصال: ${(err as Error).message}`);
+    }
     fetchTickets();
   }
 

@@ -1,8 +1,22 @@
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/src/lib/prisma";
 import { getAuthContext } from "@/src/lib/auth";
 import { assertPermission } from "@/src/lib/rbac";
 import { ok, fail } from "@/src/lib/http";
+
+const CreateBranchSchema = z.object({
+  code: z.string().min(1).max(20),
+  name: z.string().min(1).max(100),
+  taxRateBps: z.number().int().min(0).max(10000).optional(),
+  serviceChargeBps: z.number().int().min(0).max(10000).optional(),
+  currency: z.string().length(3).optional(),
+  timezone: z.string().optional(),
+  isQrOrderingEnabled: z.boolean().optional(),
+  isWaiterCallEnabled: z.boolean().optional(),
+  waiterCallCooldownSec: z.number().int().min(0).max(3600).optional(),
+  qrTokenSecret: z.string().optional(),
+});
 
 /* GET /api/admin/branches — list all branches in the org */
 export async function GET(req: NextRequest) {
@@ -38,18 +52,9 @@ export async function POST(req: NextRequest) {
     const ctx = getAuthContext(req);
     assertPermission(ctx, "catalog:write");
 
-    const body = (await req.json()) as {
-      code?: string;
-      name?: string;
-      taxRateBps?: number;
-      serviceChargeBps?: number;
-      currency?: string;
-      timezone?: string;
-      isQrOrderingEnabled?: boolean;
-      isWaiterCallEnabled?: boolean;
-      waiterCallCooldownSec?: number;
-      qrTokenSecret?: string;
-    };
+    const parsed = CreateBranchSchema.safeParse(await req.json());
+    if (!parsed.success) return fail(JSON.stringify(parsed.error.flatten().fieldErrors), 400);
+    const body = parsed.data;
 
     if (!body.code || !body.name) {
       return fail("code, name are required", 400);

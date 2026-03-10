@@ -1,8 +1,16 @@
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/src/lib/prisma";
 import { fail, ok } from "@/src/lib/http";
 import { getAuthContext } from "@/src/lib/auth";
 import { assertPermission } from "@/src/lib/rbac";
+
+const LoyaltySchema = z.object({
+  pointsPerSar: z.number().positive().optional(),
+  redemptionRate: z.number().positive().max(1).optional(),
+  minRedeemPoints: z.number().int().nonnegative().optional(),
+  isActive: z.boolean().optional(),
+});
 
 /**
  * GET /api/admin/loyalty — get loyalty program config
@@ -28,8 +36,9 @@ export async function POST(req: NextRequest) {
     const ctx = getAuthContext(req);
     assertPermission(ctx, "catalog:write");
 
-    const body = await req.json();
-    const { pointsPerSar, redemptionRate, minRedeemPoints, isActive } = body;
+    const parsed = LoyaltySchema.safeParse(await req.json());
+    if (!parsed.success) return fail(JSON.stringify(parsed.error.flatten().fieldErrors), 400);
+    const { pointsPerSar, redemptionRate, minRedeemPoints, isActive } = parsed.data;
 
     const program = await prisma.loyaltyProgram.upsert({
       where: { organizationId: ctx.organizationId },
