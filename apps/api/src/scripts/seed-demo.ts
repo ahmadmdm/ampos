@@ -337,6 +337,7 @@ async function main() {
     }
   });
 
+  await prisma.kitchenTicketItem.deleteMany({ where: { ticket: { orderId: orderA.id } } });
   await prisma.orderItem.deleteMany({ where: { orderId: orderA.id } });
   const orderAItems = await Promise.all([
     prisma.orderItem.create({
@@ -449,6 +450,7 @@ async function main() {
     }
   });
 
+  await prisma.kitchenTicketItem.deleteMany({ where: { ticket: { orderId: orderB.id } } });
   await prisma.orderItem.deleteMany({ where: { orderId: orderB.id } });
   const orderBItem = await prisma.orderItem.create({
     data: {
